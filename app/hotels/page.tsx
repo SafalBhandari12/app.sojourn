@@ -232,7 +232,7 @@ export default function HotelsPage() {
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, location: e.target.value }))
                 }
-                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all'
+                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all text-black'
               />
             </div>
 
@@ -246,7 +246,7 @@ export default function HotelsPage() {
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, checkIn: e.target.value }))
                 }
-                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all'
+                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all text-black'
               />
             </div>
 
@@ -260,7 +260,7 @@ export default function HotelsPage() {
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, checkOut: e.target.value }))
                 }
-                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all'
+                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all text-black'
               />
             </div>
 
@@ -276,7 +276,7 @@ export default function HotelsPage() {
                     guests: parseInt(e.target.value),
                   }))
                 }
-                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all'
+                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all text-black'
               >
                 {[1, 2, 3, 4, 5, 6].map((num) => (
                   <option key={num} value={num}>
@@ -356,7 +356,7 @@ export default function HotelsPage() {
                           minPrice: parseInt(e.target.value) || 0,
                         }))
                       }
-                      className='w-full px-3 py-1 border border-gray-300 rounded text-sm'
+                      className='w-full px-3 py-1 border border-gray-300 rounded text-sm text-black'
                       placeholder='0'
                     />
                   </div>
@@ -373,7 +373,7 @@ export default function HotelsPage() {
                           maxPrice: parseInt(e.target.value) || 50000,
                         }))
                       }
-                      className='w-full px-3 py-1 border border-gray-300 rounded text-sm'
+                      className='w-full px-3 py-1 border border-gray-300 rounded text-sm text-black'
                       placeholder='50000'
                     />
                   </div>
@@ -450,7 +450,7 @@ export default function HotelsPage() {
               </h1>
               {hotels.length > 0 && (
                 <div className='flex items-center space-x-4'>
-                  <select className='border border-gray-300 rounded-lg px-3 py-2 text-sm'>
+                  <select className='border border-gray-300 rounded-lg px-3 py-2 text-sm text-black'>
                     <option>Sort by: Popularity</option>
                     <option>Price: Low to High</option>
                     <option>Price: High to Low</option>
@@ -671,7 +671,11 @@ export default function HotelsPage() {
                             </div>
 
                             <Link
-                              href={`/hotels/${hotel.id}`}
+                              href={`/hotels/${hotel.id}${
+                                filters.checkIn && filters.checkOut
+                                  ? `?checkIn=${filters.checkIn}&checkOut=${filters.checkOut}&guests=${filters.guests}`
+                                  : ""
+                              }`}
                               className='inline-block bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-xl font-semibold mb-3 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
                             >
                               View Details

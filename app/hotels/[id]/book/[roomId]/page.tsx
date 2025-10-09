@@ -71,6 +71,8 @@ export default function BookingPage() {
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [localCheckIn, setLocalCheckIn] = useState(checkIn);
+  const [localCheckOut, setLocalCheckOut] = useState(checkOut);
   const [priceDetails, setPriceDetails] = useState({
     pricePerNight: 0,
     totalPrice: 0,
@@ -82,8 +84,8 @@ export default function BookingPage() {
   const [formData, setFormData] = useState<BookingData>({
     hotelId,
     roomId,
-    checkInDate: checkIn,
-    checkOutDate: checkOut,
+    checkInDate: localCheckIn || checkIn,
+    checkOutDate: localCheckOut || checkOut,
     numberOfGuests: guests,
     guestDetails: {
       primaryGuest: {
@@ -97,6 +99,15 @@ export default function BookingPage() {
   });
 
   useEffect(() => {
+    // Debug: Log search params
+    console.log("Debug - Search Params:", {
+      checkIn,
+      checkOut,
+      guests,
+      hotelId,
+      roomId,
+    });
+
     // Check authentication
     if (!AuthService.isAuthenticated()) {
       router.push("/auth");
@@ -109,7 +120,15 @@ export default function BookingPage() {
 
   useEffect(() => {
     calculatePricing();
-  }, [checkIn, checkOut]);
+  }, [localCheckIn, localCheckOut, room]);
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      checkInDate: localCheckIn || checkIn,
+      checkOutDate: localCheckOut || checkOut,
+    }));
+  }, [localCheckIn, localCheckOut, checkIn, checkOut]);
 
   const fetchBookingDetails = async () => {
     try {
@@ -153,10 +172,13 @@ export default function BookingPage() {
   };
 
   const calculatePricing = () => {
-    if (!checkIn || !checkOut || !room) return;
+    const currentCheckIn = localCheckIn || checkIn;
+    const currentCheckOut = localCheckOut || checkOut;
 
-    const start = new Date(checkIn);
-    const end = new Date(checkOut);
+    if (!currentCheckIn || !currentCheckOut || !room) return;
+
+    const start = new Date(currentCheckIn);
+    const end = new Date(currentCheckOut);
     const nights = Math.ceil(
       (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
     );
@@ -322,7 +344,10 @@ export default function BookingPage() {
   if (loading) {
     return (
       <div className='min-h-screen flex items-center justify-center'>
-        <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600'></div>
+        <div className='text-center'>
+          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4'></div>
+          <p className='text-gray-600'>Loading booking details...</p>
+        </div>
       </div>
     );
   }
@@ -331,10 +356,13 @@ export default function BookingPage() {
     return (
       <div className='min-h-screen flex items-center justify-center'>
         <div className='text-center'>
-          <h1 className='text-2xl font-bold text-gray-900 mb-4'>
+          <h1 className='text-xl font-medium text-gray-900 mb-4'>
             Booking Details Not Found
           </h1>
-          <Link href='/hotels' className='text-blue-600 hover:text-blue-700'>
+          <Link
+            href='/hotels'
+            className='text-gray-600 hover:text-gray-900 underline'
+          >
             Back to Hotels
           </Link>
         </div>
@@ -345,19 +373,22 @@ export default function BookingPage() {
   return (
     <div className='min-h-screen bg-gray-50'>
       {/* Header */}
-      <header className='bg-white shadow-sm border-b'>
+      <header className='bg-white border-b border-gray-200'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
           <div className='flex items-center justify-between h-16'>
-            <Link href='/' className='text-2xl font-bold text-blue-600'>
+            <Link href='/' className='text-2xl font-semibold text-gray-900'>
               Sojourn
             </Link>
             <nav className='hidden md:flex space-x-8'>
-              <Link href='/hotels' className='text-blue-600 font-medium'>
+              <Link
+                href='/hotels'
+                className='text-gray-600 hover:text-gray-900 font-medium'
+              >
                 Hotels
               </Link>
               <Link
                 href='/dashboard'
-                className='text-gray-700 hover:text-blue-600'
+                className='text-gray-600 hover:text-gray-900'
               >
                 Dashboard
               </Link>
@@ -374,38 +405,96 @@ export default function BookingPage() {
           {/* Left Column - Booking Form */}
           <div className='lg:col-span-2 space-y-6'>
             {/* Booking Details */}
-            <div className='bg-white rounded-lg shadow-md p-6'>
-              <h2 className='text-2xl font-bold mb-4'>Complete Your Booking</h2>
+            <div className='bg-white border border-gray-200 p-6'>
+              <h2 className='text-xl font-semibold mb-4'>Booking Details</h2>
 
               {/* Hotel & Room Info */}
-              <div className='bg-gray-50 rounded-lg p-4 mb-6'>
-                <h3 className='font-semibold text-lg'>{hotel.hotelName}</h3>
-                <p className='text-gray-600'>{hotel.vendor.businessAddress}</p>
-                <div className='mt-2 space-y-1'>
+              <div className='bg-gray-50 border border-gray-200 p-4 mb-6'>
+                <h3 className='font-medium text-lg'>{hotel.hotelName}</h3>
+                <p className='text-gray-600 text-sm'>
+                  {hotel.vendor.businessAddress}
+                </p>
+                <div className='mt-3 space-y-1 text-sm'>
                   <p>
-                    <strong>Room:</strong> {room.roomType} (Room{" "}
-                    {room.roomNumber})
+                    <span className='font-medium'>Room:</span> {room.roomType}{" "}
+                    (Room {room.roomNumber})
                   </p>
                   <p>
-                    <strong>Check-in:</strong>{" "}
-                    {new Date(checkIn).toLocaleDateString()}
+                    <span className='font-medium'>Check-in:</span>{" "}
+                    {localCheckIn || checkIn
+                      ? new Date(localCheckIn || checkIn).toLocaleDateString()
+                      : "Not selected"}
                   </p>
                   <p>
-                    <strong>Check-out:</strong>{" "}
-                    {new Date(checkOut).toLocaleDateString()}
+                    <span className='font-medium'>Check-out:</span>{" "}
+                    {localCheckOut || checkOut
+                      ? new Date(localCheckOut || checkOut).toLocaleDateString()
+                      : "Not selected"}
                   </p>
                   <p>
-                    <strong>Guests:</strong> {guests}
+                    <span className='font-medium'>Guests:</span> {guests}
                   </p>
                   <p>
-                    <strong>Nights:</strong> {priceDetails.nights}
+                    <span className='font-medium'>Nights:</span>{" "}
+                    {priceDetails.nights}
                   </p>
                 </div>
               </div>
 
+              {/* Date Selection (if not provided in URL) */}
+              {(!(localCheckIn || checkIn) || !(localCheckOut || checkOut)) && (
+                <div className='bg-yellow-50 border border-yellow-200 p-4 mb-6'>
+                  <h4 className='font-medium text-sm mb-3'>
+                    Select Your Dates
+                  </h4>
+                  <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                    <div>
+                      <label className='block text-sm font-medium text-gray-700 mb-1'>
+                        Check-in Date
+                      </label>
+                      <input
+                        type='date'
+                        value={localCheckIn}
+                        onChange={(e) => {
+                          const newCheckIn = e.target.value;
+                          setLocalCheckIn(newCheckIn);
+                          setFormData((prev) => ({
+                            ...prev,
+                            checkInDate: newCheckIn,
+                          }));
+                        }}
+                        className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
+                        min={new Date().toISOString().split("T")[0]}
+                      />
+                    </div>
+                    <div>
+                      <label className='block text-sm font-medium text-gray-700 mb-1'>
+                        Check-out Date
+                      </label>
+                      <input
+                        type='date'
+                        value={localCheckOut}
+                        onChange={(e) => {
+                          const newCheckOut = e.target.value;
+                          setLocalCheckOut(newCheckOut);
+                          setFormData((prev) => ({
+                            ...prev,
+                            checkOutDate: newCheckOut,
+                          }));
+                        }}
+                        className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
+                        min={
+                          localCheckIn || new Date().toISOString().split("T")[0]
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Primary Guest Details */}
               <div className='space-y-4'>
-                <h3 className='text-lg font-semibold'>Primary Guest Details</h3>
+                <h3 className='text-lg font-medium'>Primary Guest Details</h3>
 
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <div>
@@ -418,7 +507,7 @@ export default function BookingPage() {
                       onChange={(e) =>
                         handleInputChange("primaryGuest.name", e.target.value)
                       }
-                      className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
                       placeholder='Enter full name'
                     />
                   </div>
@@ -433,7 +522,7 @@ export default function BookingPage() {
                       onChange={(e) =>
                         handleInputChange("primaryGuest.phone", e.target.value)
                       }
-                      className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
                       placeholder='Enter phone number'
                     />
                   </div>
@@ -448,7 +537,7 @@ export default function BookingPage() {
                       onChange={(e) =>
                         handleInputChange("primaryGuest.email", e.target.value)
                       }
-                      className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
                       placeholder='Enter email address'
                     />
                   </div>
@@ -458,13 +547,16 @@ export default function BookingPage() {
               {/* Additional Guests */}
               {formData.guestDetails.additionalGuests.length > 0 && (
                 <div className='space-y-4 mt-6'>
-                  <h3 className='text-lg font-semibold'>
+                  <h3 className='text-lg font-medium'>
                     Additional Guest Details
                   </h3>
 
                   {formData.guestDetails.additionalGuests.map(
                     (guest, index) => (
-                      <div key={index} className='bg-gray-50 rounded-lg p-4'>
+                      <div
+                        key={index}
+                        className='bg-gray-50 border border-gray-200 p-4'
+                      >
                         <h4 className='font-medium mb-3'>Guest {index + 2}</h4>
                         <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                           <div>
@@ -480,7 +572,7 @@ export default function BookingPage() {
                                   e.target.value
                                 )
                               }
-                              className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                              className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
                               placeholder='Enter full name'
                             />
                           </div>
@@ -498,7 +590,7 @@ export default function BookingPage() {
                                   e.target.value
                                 )
                               }
-                              className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                              className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
                               placeholder='Enter age'
                               min='1'
                               max='120'
@@ -513,7 +605,7 @@ export default function BookingPage() {
 
               {/* Special Requests */}
               <div className='space-y-4 mt-6'>
-                <h3 className='text-lg font-semibold'>
+                <h3 className='text-lg font-medium'>
                   Special Requests (Optional)
                 </h3>
                 <textarea
@@ -522,7 +614,7 @@ export default function BookingPage() {
                     handleInputChange("specialRequests", e.target.value)
                   }
                   rows={3}
-                  className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                  className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
                   placeholder='Any special requests or preferences...'
                 />
               </div>
@@ -531,8 +623,8 @@ export default function BookingPage() {
 
           {/* Right Column - Price Summary */}
           <div className='space-y-6'>
-            <div className='bg-white rounded-lg shadow-md p-6'>
-              <h3 className='text-lg font-bold mb-4'>Price Summary</h3>
+            <div className='bg-white border border-gray-200 p-6'>
+              <h3 className='text-lg font-medium mb-4'>Price Summary</h3>
 
               <div className='space-y-3'>
                 <div className='flex justify-between'>
@@ -550,7 +642,7 @@ export default function BookingPage() {
 
                 <hr className='my-3' />
 
-                <div className='flex justify-between text-lg font-bold'>
+                <div className='flex justify-between text-lg font-medium'>
                   <span>Total Amount</span>
                   <span>₹{priceDetails.finalAmount.toLocaleString()}</span>
                 </div>
@@ -559,7 +651,7 @@ export default function BookingPage() {
               <button
                 onClick={createBooking}
                 disabled={bookingLoading}
-                className='w-full mt-6 bg-gray-900 hover:bg-gray-800 text-white py-3 px-4 rounded-lg font-semibold disabled:opacity-50'
+                className='w-full mt-6 bg-gray-900 hover:bg-gray-800 text-white py-3 px-4 font-medium disabled:opacity-50'
               >
                 {bookingLoading ? "Processing..." : "Proceed to Payment"}
               </button>
@@ -574,12 +666,24 @@ export default function BookingPage() {
             </div>
 
             {/* Room Amenities */}
-            <div className='bg-white rounded-lg shadow-md p-6'>
-              <h3 className='text-lg font-bold mb-4'>Room Amenities</h3>
+            <div className='bg-white border border-gray-200 p-6'>
+              <h3 className='text-lg font-medium mb-4'>Room Amenities</h3>
               <div className='space-y-2'>
                 {room.amenities.map((amenity) => (
                   <div key={amenity} className='flex items-center'>
-                    <span className='text-green-500 mr-2'>✓</span>
+                    <svg
+                      className='h-4 w-4 text-gray-600 mr-2'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M5 13l4 4L19 7'
+                      />
+                    </svg>
                     <span className='text-sm capitalize'>{amenity}</span>
                   </div>
                 ))}
