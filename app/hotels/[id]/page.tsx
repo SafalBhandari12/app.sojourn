@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { AuthService } from "../../../lib/auth";
@@ -78,6 +78,7 @@ const BACKEND_URL =
 export default function HotelDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const hotelId = params.id as string;
 
   const [hotel, setHotel] = useState<Hotel | null>(null);
@@ -96,6 +97,17 @@ export default function HotelDetailsPage() {
   useEffect(() => {
     fetchHotelDetails();
   }, [hotelId]);
+
+  // Read URL parameters and set form values
+  useEffect(() => {
+    const urlCheckIn = searchParams.get("checkIn");
+    const urlCheckOut = searchParams.get("checkOut");
+    const urlGuests = searchParams.get("guests");
+
+    if (urlCheckIn) setCheckIn(urlCheckIn);
+    if (urlCheckOut) setCheckOut(urlCheckOut);
+    if (urlGuests) setGuests(parseInt(urlGuests));
+  }, [searchParams]);
 
   useEffect(() => {
     if (checkIn && checkOut && guests) {
