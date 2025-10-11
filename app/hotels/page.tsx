@@ -49,7 +49,7 @@ interface SearchFilters {
 }
 
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+  process.env.NEXT_PUBLIC_BACKEND_URL || "https://sojournbackend.onrender.com";
 
 export default function HotelsPage() {
   const searchParams = useSearchParams();

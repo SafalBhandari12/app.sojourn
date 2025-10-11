@@ -73,7 +73,7 @@ interface RoomAvailability {
 }
 
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+  process.env.NEXT_PUBLIC_BACKEND_URL || "https://sojournbackend.onrender.com";
 
 export default function HotelDetailsPage() {
   const params = useParams();
@@ -193,6 +193,32 @@ export default function HotelDetailsPage() {
     const end = new Date(checkOut);
     const diffTime = Math.abs(end.getTime() - start.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const calculateSeasonalPrice = (room: any, checkInDate?: string) => {
+    if (!room.basePrice && !room.summerPrice && !room.winterPrice) {
+      return null;
+    }
+
+    if (!checkInDate) {
+      // If no check-in date, return base price or current season price
+      const currentMonth = new Date().getMonth() + 1;
+      const isSummer = currentMonth >= 4 && currentMonth <= 9;
+      return isSummer
+        ? room.summerPrice || room.basePrice
+        : room.winterPrice || room.basePrice;
+    }
+
+    const checkIn = new Date(checkInDate);
+    const month = checkIn.getMonth() + 1; // getMonth() returns 0-11
+
+    // Summer: April-September (months 4-9)
+    // Winter: October-March (months 10-12, 1-3)
+    const isSummer = month >= 4 && month <= 9;
+
+    return isSummer
+      ? room.summerPrice || room.basePrice
+      : room.winterPrice || room.basePrice;
   };
 
   if (loading) {
@@ -895,39 +921,14 @@ export default function HotelDetailsPage() {
               </div>
 
               <div className='p-6'>
-                {!checkIn || !checkOut ? (
-                  <div className='text-center py-12'>
-                    <div className='bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4'>
-                      <svg
-                        className='w-8 h-8 text-gray-400'
-                        fill='none'
-                        stroke='currentColor'
-                        viewBox='0 0 24 24'
-                      >
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          strokeWidth={2}
-                          d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'
-                        />
-                      </svg>
-                    </div>
-                    <p className='text-gray-500 text-lg mb-2'>
-                      Select Your Dates
-                    </p>
-                    <p className='text-gray-400 text-sm'>
-                      Choose check-in and check-out dates to see available rooms
-                      and pricing
-                    </p>
-                  </div>
-                ) : availabilityLoading ? (
+                {availabilityLoading ? (
                   <div className='text-center py-12'>
                     <div className='animate-spin rounded-full h-12 w-12 border-b-4 border-gray-900 mx-auto mb-4'></div>
                     <p className='text-gray-600 text-lg'>
                       Checking availability...
                     </p>
                   </div>
-                ) : availableRooms.length === 0 ? (
+                ) : checkIn && checkOut && availableRooms.length === 0 ? (
                   <div className='text-center py-12'>
                     <div className='bg-red-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4'>
                       <svg
@@ -952,7 +953,13 @@ export default function HotelDetailsPage() {
                       different dates.
                     </p>
                   </div>
-                ) : (
+                ) : checkIn &&
+                  checkOut &&
+                  availableRooms.length > 0 &&
+                  availableRooms.some(
+                    (room) => room.pricePerNight && room.pricePerNight > 0
+                  ) ? (
+                  // Show availability API results when they have proper pricing
                   <div className='space-y-6'>
                     {availableRooms.map((room) => (
                       <div
@@ -1069,6 +1076,237 @@ export default function HotelDetailsPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                ) : (
+                  // Show hotel rooms with calculated seasonal pricing when no dates selected OR when availability API doesn't return proper pricing
+                  <div className='space-y-6'>
+                    {!checkIn || !checkOut ? (
+                      <div className='text-center py-4 mb-4'>
+                        <div className='bg-blue-50 rounded-lg p-4'>
+                          <p className='text-blue-800 font-medium'>
+                            Select dates to check availability and get exact
+                            pricing
+                          </p>
+                          <p className='text-blue-600 text-sm mt-1'>
+                            Showing seasonal pricing for reference
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className='text-center py-4 mb-4'>
+                        <div className='bg-amber-50 rounded-lg p-4'>
+                          <p className='text-amber-800 font-medium'>
+                            Showing available rooms with seasonal pricing
+                          </p>
+                          <p className='text-amber-600 text-sm mt-1'>
+                            Prices calculated based on your selected dates
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {hotel.rooms && hotel.rooms.length > 0 ? (
+                      hotel.rooms.map((room) => {
+                        const seasonalPrice = calculateSeasonalPrice(
+                          room,
+                          checkIn
+                        );
+                        const nights = calculateNights();
+                        const totalPrice =
+                          nights > 0 && seasonalPrice
+                            ? seasonalPrice * nights
+                            : null;
+
+                        return (
+                          <div
+                            key={room.id}
+                            className='bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1'
+                          >
+                            <div className='flex justify-between items-start mb-4'>
+                              <div className='flex-1'>
+                                <div className='flex items-center justify-between mb-3'>
+                                  <h3 className='text-xl font-bold text-gray-900'>
+                                    {room.roomType}
+                                  </h3>
+                                  <span className='bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium'>
+                                    Room {room.roomNumber}
+                                  </span>
+                                </div>
+                                <div className='flex items-center text-gray-600 mb-3'>
+                                  <svg
+                                    className='w-5 h-5 mr-2'
+                                    fill='none'
+                                    stroke='currentColor'
+                                    viewBox='0 0 24 24'
+                                  >
+                                    <path
+                                      strokeLinecap='round'
+                                      strokeLinejoin='round'
+                                      strokeWidth={2}
+                                      d='M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'
+                                    />
+                                  </svg>
+                                  <span>Up to {room.capacity} guests</span>
+                                </div>
+                                <div className='flex items-center text-sm text-gray-500 mb-3'>
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      room.isAvailable
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
+                                    }`}
+                                  >
+                                    {room.isAvailable
+                                      ? "Available"
+                                      : "Not Available"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className='mb-4'>
+                              <h4 className='font-semibold text-gray-900 mb-2'>
+                                Room Amenities
+                              </h4>
+                              <div className='flex flex-wrap gap-2'>
+                                {room.amenities && room.amenities.length > 0 ? (
+                                  <>
+                                    {room.amenities
+                                      .slice(0, 4)
+                                      .map((amenity) => (
+                                        <span
+                                          key={amenity}
+                                          className='bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium'
+                                        >
+                                          {amenity}
+                                        </span>
+                                      ))}
+                                    {room.amenities.length > 4 && (
+                                      <span className='text-gray-500 text-xs font-medium px-3 py-1'>
+                                        +{room.amenities.length - 4} more
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className='text-gray-500 text-xs'>
+                                    No amenities listed
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className='border-t border-gray-200 pt-4'>
+                              <div className='flex justify-between items-center'>
+                                <div className='flex-1'>
+                                  {seasonalPrice ? (
+                                    <>
+                                      <div className='flex items-baseline gap-2 mb-1'>
+                                        <span className='text-2xl font-bold text-gray-900'>
+                                          ₹{seasonalPrice.toLocaleString()}
+                                        </span>
+                                        <span className='text-gray-500 text-sm'>
+                                          per night
+                                        </span>
+                                      </div>
+                                      <div className='text-xs text-gray-500 mb-2'>
+                                        Base: ₹{room.basePrice.toLocaleString()}{" "}
+                                        | Summer: ₹
+                                        {room.summerPrice.toLocaleString()} |
+                                        Winter: ₹
+                                        {room.winterPrice.toLocaleString()}
+                                      </div>
+                                      {totalPrice && (
+                                        <div className='bg-gray-100 rounded-lg p-3 mt-2'>
+                                          <div className='text-sm text-gray-600 mb-1'>
+                                            {nights} night
+                                            {nights !== 1 ? "s" : ""} total
+                                          </div>
+                                          <div className='text-lg font-bold text-gray-900'>
+                                            ₹{totalPrice.toLocaleString()}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <div className='flex items-baseline gap-2 mb-1'>
+                                      <span className='text-2xl font-bold text-gray-900'>
+                                        Price on request
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className='ml-4'>
+                                  {!checkIn || !checkOut ? (
+                                    <div className='text-center'>
+                                      <p className='text-sm text-gray-500 mb-2'>
+                                        Select dates to book
+                                      </p>
+                                      <button
+                                        onClick={() => {
+                                          document
+                                            .querySelector('input[type="date"]')
+                                            ?.scrollIntoView({
+                                              behavior: "smooth",
+                                            });
+                                        }}
+                                        className='bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all'
+                                      >
+                                        Select Dates
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        const roomForBooking = {
+                                          id: room.id,
+                                          roomType: room.roomType,
+                                          roomNumber: room.roomNumber,
+                                          capacity: room.capacity,
+                                          pricePerNight: seasonalPrice,
+                                          totalPrice:
+                                            totalPrice || seasonalPrice,
+                                          amenities: room.amenities,
+                                        };
+                                        handleBookRoom(roomForBooking);
+                                      }}
+                                      disabled={!room.isAvailable}
+                                      className='bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed'
+                                    >
+                                      {room.isAvailable
+                                        ? "Book Now"
+                                        : "Not Available"}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className='text-center py-12'>
+                        <div className='bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4'>
+                          <svg
+                            className='w-8 h-8 text-gray-400'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'
+                            />
+                          </svg>
+                        </div>
+                        <p className='text-gray-500 text-lg mb-2'>
+                          No Rooms Available
+                        </p>
+                        <p className='text-gray-400 text-sm'>
+                          This hotel doesn't have any rooms configured.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

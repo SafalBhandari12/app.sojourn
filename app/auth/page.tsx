@@ -29,7 +29,7 @@ interface VerifyOTPResponse {
 }
 
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+  process.env.NEXT_PUBLIC_BACKEND_URL || "https://sojournbackend.onrender.com";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -56,7 +56,7 @@ export default function AuthPage() {
     setError("");
 
     try {
-      const response = await fetch(`${BACKEND_URL}/auth/send-otp`, {
+      const response = await fetch(`${BACKEND_URL}/api/auth/send-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -88,7 +88,7 @@ export default function AuthPage() {
     setError("");
 
     try {
-      const response = await fetch(`${BACKEND_URL}/auth/verify-otp`, {
+      const response = await fetch(`${BACKEND_URL}/api/auth/verify-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -112,8 +112,9 @@ export default function AuthPage() {
           data.data.user
         );
 
-        // Redirect to dashboard
-        window.location.href = "/dashboard";
+        // Redirect to returnUrl if available, otherwise to dashboard
+        const redirectUrl = returnUrl || "/dashboard";
+        window.location.href = redirectUrl;
       } else {
         setError(data.message || "Invalid OTP");
       }

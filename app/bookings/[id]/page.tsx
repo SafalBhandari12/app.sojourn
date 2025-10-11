@@ -75,7 +75,7 @@ interface BookingDetails {
 }
 
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+  process.env.NEXT_PUBLIC_BACKEND_URL || "https://sojournbackend.onrender.com";
 
 export default function BookingDetailsPage() {
   const params = useParams();

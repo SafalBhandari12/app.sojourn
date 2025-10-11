@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import Script from "next/script";
 import { AuthService } from "../../../../../lib/auth";
+import PaymentUtils from "../../../../../lib/payment-utils";
 
 interface BookingData {
   hotelId: string;
@@ -46,14 +48,8 @@ interface Room {
   amenities: string[];
 }
 
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
-}
-
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+  process.env.NEXT_PUBLIC_BACKEND_URL || "https://sojournbackend.onrender.com";
 
 export default function BookingPage() {
   const params = useParams();
@@ -71,6 +67,7 @@ export default function BookingPage() {
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   const [localCheckIn, setLocalCheckIn] = useState(checkIn);
   const [localCheckOut, setLocalCheckOut] = useState(checkOut);
   const [priceDetails, setPriceDetails] = useState({
@@ -99,6 +96,9 @@ export default function BookingPage() {
   });
 
   useEffect(() => {
+    // Check if Razorpay is already loaded
+    setRazorpayLoaded(PaymentUtils.isRazorpayLoaded());
+
     // Debug: Log search params
     console.log("Debug - Search Params:", {
       checkIn,
@@ -267,16 +267,43 @@ export default function BookingPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Create payment order
+        console.log("Booking created successfully:", data.data.id);
+        console.log("Booking status:", data.data.status); // Should be 'DRAFT'
+
+        // Create payment order (changes status from DRAFT to PENDING)
         const paymentResponse = await AuthService.authenticatedFetch(
           `${BACKEND_URL}/api/hotels/bookings/${data.data.id}/payment/create-order`,
           { method: "POST" }
         );
-
         const paymentData = await paymentResponse.json();
 
         if (paymentData.success) {
+          console.log(
+            "Payment order created, booking status changed to PENDING"
+          );
+          console.log("Room is now reserved for this customer");
           initiatePayment(paymentData.data, data.data.id);
+        } else {
+          console.error("Payment creation failed:", paymentData);
+
+          // Handle specific error cases
+          if (paymentData.message?.includes("Room is not available")) {
+            alert(
+              "Sorry, this room is no longer available for your selected dates. Please choose different dates or another room."
+            );
+            // Redirect back to hotel details or search
+            router.push(
+              `/hotels/${hotelId}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`
+            );
+          } else if (paymentData.message?.includes("Booking not found")) {
+            alert("Booking not found. Please try creating a new booking.");
+            router.push(`/hotels/${hotelId}`);
+          } else {
+            alert(
+              paymentData.message ||
+                "Failed to create payment order. Please try again."
+            );
+          }
         }
       } else {
         alert(data.message || "Failed to create booking");
@@ -289,28 +316,29 @@ export default function BookingPage() {
     }
   };
 
-  const initiatePayment = (paymentData: any, bookingId: string) => {
-    const options = {
-      key: paymentData.key,
-      amount: paymentData.amount,
-      currency: paymentData.currency,
-      name: hotel?.vendor.businessName || "Sojourn",
-      description: `Hotel Booking - ${hotel?.hotelName}`,
-      order_id: paymentData.orderId,
-      prefill: paymentData.prefill,
-      theme: paymentData.theme,
-      handler: async (response: any) => {
-        await verifyPayment(response, bookingId);
-      },
-      modal: {
-        ondismiss: () => {
-          console.log("Payment dismissed");
+  const initiatePayment = async (paymentData: any, bookingId: string) => {
+    try {
+      const options = PaymentUtils.formatPaymentOptions(
+        paymentData,
+        bookingId,
+        async (response: any) => {
+          await verifyPayment(response, bookingId);
         },
-      },
-    };
+        () => {
+          console.log("Payment modal dismissed");
+          // Booking remains in PENDING status - customer can retry payment
+        }
+      );
 
-    const rzp = new window.Razorpay(options);
-    rzp.open();
+      const success = await PaymentUtils.initializePayment(options);
+
+      if (!success) {
+        alert("Failed to initialize payment. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error initiating payment:", error);
+      alert("Payment initialization failed. Please try again.");
+    }
   };
 
   const verifyPayment = async (paymentResponse: any, bookingId: string) => {
@@ -328,16 +356,49 @@ export default function BookingPage() {
       );
 
       const data = await response.json();
+      PaymentUtils.logApiResponse(data, "Payment Verification");
 
-      if (data.success) {
+      if (PaymentUtils.validateApiResponse(data)) {
+        console.log(
+          "Payment verified successfully, booking status changed to CONFIRMED"
+        );
+
         alert("Payment successful! Your booking has been confirmed.");
-        router.push(`/bookings/${bookingId}`);
+
+        // Safely check for invoice
+        const invoiceUrl = PaymentUtils.safeGet(
+          data,
+          "data.invoice.invoiceUrl"
+        );
+        if (invoiceUrl) {
+          console.log("Invoice available:", invoiceUrl);
+        } else {
+          console.log("No invoice data in response");
+        }
+
+        // Redirect to booking confirmation page or dashboard
+        try {
+          router.push(`/bookings/${bookingId}`);
+        } catch (routerError) {
+          console.error(
+            "Router error, redirecting to bookings list:",
+            routerError
+          );
+          router.push("/bookings");
+        }
       } else {
-        alert("Payment verification failed. Please contact support.");
+        console.error("Payment verification failed:", data);
+        alert(
+          `Payment verification failed: ${
+            data.message || "Unknown error"
+          }. If money was deducted, it will be refunded within 5-7 business days. Please contact support.`
+        );
       }
     } catch (error) {
       console.error("Error verifying payment:", error);
-      alert("Payment verification failed. Please contact support.");
+      alert(
+        "Payment verification failed due to network error. Please contact support."
+      );
     }
   };
 
@@ -398,7 +459,17 @@ export default function BookingPage() {
       </header>
 
       {/* Load Razorpay Script */}
-      <script src='https://checkout.razorpay.com/v1/checkout.js'></script>
+      <Script
+        src='https://checkout.razorpay.com/v1/checkout.js'
+        onLoad={() => {
+          console.log("Razorpay script loaded successfully");
+          setRazorpayLoaded(PaymentUtils.isRazorpayLoaded());
+        }}
+        onError={() => {
+          console.error("Failed to load Razorpay script");
+          setRazorpayLoaded(false);
+        }}
+      />
 
       <main className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6'>
         <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
@@ -406,45 +477,73 @@ export default function BookingPage() {
           <div className='lg:col-span-2 space-y-6'>
             {/* Booking Details */}
             <div className='bg-white border border-gray-200 p-6'>
-              <h2 className='text-xl font-semibold mb-4'>Booking Details</h2>
+              <h2 className='text-xl font-semibold mb-4 text-gray-900'>
+                Booking Details
+              </h2>
 
               {/* Hotel & Room Info */}
               <div className='bg-gray-50 border border-gray-200 p-4 mb-6'>
-                <h3 className='font-medium text-lg'>{hotel.hotelName}</h3>
+                <h3 className='font-medium text-lg text-gray-900'>
+                  {hotel.hotelName}
+                </h3>
                 <p className='text-gray-600 text-sm'>
                   {hotel.vendor.businessAddress}
                 </p>
-                <div className='mt-3 space-y-1 text-sm'>
+                <div className='mt-3 space-y-1 text-sm text-gray-700'>
                   <p>
-                    <span className='font-medium'>Room:</span> {room.roomType}{" "}
-                    (Room {room.roomNumber})
+                    <span className='font-medium text-gray-900'>Room:</span>{" "}
+                    {room.roomType} (Room {room.roomNumber})
                   </p>
                   <p>
-                    <span className='font-medium'>Check-in:</span>{" "}
+                    <span className='font-medium text-gray-900'>Check-in:</span>{" "}
                     {localCheckIn || checkIn
                       ? new Date(localCheckIn || checkIn).toLocaleDateString()
                       : "Not selected"}
                   </p>
                   <p>
-                    <span className='font-medium'>Check-out:</span>{" "}
+                    <span className='font-medium text-gray-900'>
+                      Check-out:
+                    </span>{" "}
                     {localCheckOut || checkOut
                       ? new Date(localCheckOut || checkOut).toLocaleDateString()
                       : "Not selected"}
                   </p>
                   <p>
-                    <span className='font-medium'>Guests:</span> {guests}
+                    <span className='font-medium text-gray-900'>Guests:</span>{" "}
+                    {guests}
                   </p>
                   <p>
-                    <span className='font-medium'>Nights:</span>{" "}
+                    <span className='font-medium text-gray-900'>Nights:</span>{" "}
                     {priceDetails.nights}
                   </p>
+                </div>
+              </div>
+
+              {/* Booking Process Status */}
+              <div className='bg-blue-50 border border-blue-200 p-4 mb-6'>
+                <h4 className='font-medium text-blue-900 mb-2'>
+                  🔄 Booking Process
+                </h4>
+                <div className='text-sm text-blue-800 space-y-1'>
+                  <p>✅ Step 1: Fill guest details and create booking</p>
+                  <p>🔄 Step 2: Initiate payment (room will be reserved)</p>
+                  <p>⏳ Step 3: Complete payment (booking confirmed)</p>
+                </div>
+                <div className='mt-3 text-xs text-blue-600'>
+                  <p>
+                    • Your room will be reserved only when payment is initiated
+                  </p>
+                  <p>
+                    • Secure payment via Razorpay with all major payment methods
+                  </p>
+                  <p>• Instant confirmation upon successful payment</p>
                 </div>
               </div>
 
               {/* Date Selection (if not provided in URL) */}
               {(!(localCheckIn || checkIn) || !(localCheckOut || checkOut)) && (
                 <div className='bg-yellow-50 border border-yellow-200 p-4 mb-6'>
-                  <h4 className='font-medium text-sm mb-3'>
+                  <h4 className='font-medium text-sm mb-3 text-gray-900'>
                     Select Your Dates
                   </h4>
                   <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
@@ -463,7 +562,7 @@ export default function BookingPage() {
                             checkInDate: newCheckIn,
                           }));
                         }}
-                        className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
+                        className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
                         min={new Date().toISOString().split("T")[0]}
                       />
                     </div>
@@ -482,7 +581,7 @@ export default function BookingPage() {
                             checkOutDate: newCheckOut,
                           }));
                         }}
-                        className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
+                        className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
                         min={
                           localCheckIn || new Date().toISOString().split("T")[0]
                         }
@@ -494,7 +593,9 @@ export default function BookingPage() {
 
               {/* Primary Guest Details */}
               <div className='space-y-4'>
-                <h3 className='text-lg font-medium'>Primary Guest Details</h3>
+                <h3 className='text-lg font-medium text-gray-900'>
+                  Primary Guest Details
+                </h3>
 
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <div>
@@ -507,7 +608,7 @@ export default function BookingPage() {
                       onChange={(e) =>
                         handleInputChange("primaryGuest.name", e.target.value)
                       }
-                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
+                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
                       placeholder='Enter full name'
                     />
                   </div>
@@ -522,7 +623,7 @@ export default function BookingPage() {
                       onChange={(e) =>
                         handleInputChange("primaryGuest.phone", e.target.value)
                       }
-                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
+                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
                       placeholder='Enter phone number'
                     />
                   </div>
@@ -537,7 +638,7 @@ export default function BookingPage() {
                       onChange={(e) =>
                         handleInputChange("primaryGuest.email", e.target.value)
                       }
-                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
+                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
                       placeholder='Enter email address'
                     />
                   </div>
@@ -547,7 +648,7 @@ export default function BookingPage() {
               {/* Additional Guests */}
               {formData.guestDetails.additionalGuests.length > 0 && (
                 <div className='space-y-4 mt-6'>
-                  <h3 className='text-lg font-medium'>
+                  <h3 className='text-lg font-medium text-gray-900'>
                     Additional Guest Details
                   </h3>
 
@@ -557,7 +658,9 @@ export default function BookingPage() {
                         key={index}
                         className='bg-gray-50 border border-gray-200 p-4'
                       >
-                        <h4 className='font-medium mb-3'>Guest {index + 2}</h4>
+                        <h4 className='font-medium mb-3 text-gray-900'>
+                          Guest {index + 2}
+                        </h4>
                         <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                           <div>
                             <label className='block text-sm font-medium text-gray-700 mb-1'>
@@ -572,7 +675,7 @@ export default function BookingPage() {
                                   e.target.value
                                 )
                               }
-                              className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
+                              className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
                               placeholder='Enter full name'
                             />
                           </div>
@@ -590,7 +693,7 @@ export default function BookingPage() {
                                   e.target.value
                                 )
                               }
-                              className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
+                              className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
                               placeholder='Enter age'
                               min='1'
                               max='120'
@@ -605,7 +708,7 @@ export default function BookingPage() {
 
               {/* Special Requests */}
               <div className='space-y-4 mt-6'>
-                <h3 className='text-lg font-medium'>
+                <h3 className='text-lg font-medium text-gray-900'>
                   Special Requests (Optional)
                 </h3>
                 <textarea
@@ -614,7 +717,7 @@ export default function BookingPage() {
                     handleInputChange("specialRequests", e.target.value)
                   }
                   rows={3}
-                  className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-black'
+                  className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
                   placeholder='Any special requests or preferences...'
                 />
               </div>
@@ -624,9 +727,11 @@ export default function BookingPage() {
           {/* Right Column - Price Summary */}
           <div className='space-y-6'>
             <div className='bg-white border border-gray-200 p-6'>
-              <h3 className='text-lg font-medium mb-4'>Price Summary</h3>
+              <h3 className='text-lg font-medium mb-4 text-gray-900'>
+                Price Summary
+              </h3>
 
-              <div className='space-y-3'>
+              <div className='space-y-3 text-gray-700'>
                 <div className='flex justify-between'>
                   <span>
                     ₹{priceDetails.pricePerNight.toLocaleString()} ×{" "}
@@ -642,7 +747,7 @@ export default function BookingPage() {
 
                 <hr className='my-3' />
 
-                <div className='flex justify-between text-lg font-medium'>
+                <div className='flex justify-between text-lg font-medium text-gray-900'>
                   <span>Total Amount</span>
                   <span>₹{priceDetails.finalAmount.toLocaleString()}</span>
                 </div>
@@ -650,24 +755,38 @@ export default function BookingPage() {
 
               <button
                 onClick={createBooking}
-                disabled={bookingLoading}
+                disabled={bookingLoading || !razorpayLoaded}
                 className='w-full mt-6 bg-gray-900 hover:bg-gray-800 text-white py-3 px-4 font-medium disabled:opacity-50'
               >
-                {bookingLoading ? "Processing..." : "Proceed to Payment"}
+                {!razorpayLoaded
+                  ? "Loading Payment System..."
+                  : bookingLoading
+                  ? "Creating Booking & Processing Payment..."
+                  : "Create Booking & Pay Now"}
               </button>
 
               <div className='mt-4 text-xs text-gray-500'>
                 <p>
-                  By clicking "Proceed to Payment", you agree to our terms and
-                  conditions.
+                  By clicking "Create Booking & Pay Now", you agree to our terms
+                  and conditions.
                 </p>
-                <p className='mt-2'>Secure payment powered by Razorpay</p>
+                <p className='mt-2'>✅ Secure payment powered by Razorpay</p>
+                <p className='mt-1'>
+                  🔒 Room reserved only during payment process
+                </p>
+                {!razorpayLoaded && (
+                  <p className='mt-1 text-orange-600'>
+                    ⏳ Loading payment gateway...
+                  </p>
+                )}
               </div>
             </div>
 
             {/* Room Amenities */}
             <div className='bg-white border border-gray-200 p-6'>
-              <h3 className='text-lg font-medium mb-4'>Room Amenities</h3>
+              <h3 className='text-lg font-medium mb-4 text-gray-900'>
+                Room Amenities
+              </h3>
               <div className='space-y-2'>
                 {room.amenities.map((amenity) => (
                   <div key={amenity} className='flex items-center'>
@@ -684,7 +803,9 @@ export default function BookingPage() {
                         d='M5 13l4 4L19 7'
                       />
                     </svg>
-                    <span className='text-sm capitalize'>{amenity}</span>
+                    <span className='text-sm capitalize text-gray-700'>
+                      {amenity}
+                    </span>
                   </div>
                 ))}
               </div>
