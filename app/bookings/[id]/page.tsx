@@ -1,77 +1,59 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthService } from "../../../lib/auth";
 
 interface BookingDetails {
-  id: string;
+  bookingRef: string;
+  status: string;
   checkInDate: string;
   checkOutDate: string;
   numberOfGuests: number;
   totalAmount: number;
-  status: string;
-  user: {
-    phoneNumber: string;
-  };
-  booking: {
-    id: string;
-    bookingType: string;
-    totalAmount: number;
-    commissionAmount: number;
-    status: string;
-    payment?: {
-      paymentStatus: string;
-      paymentMethod: string;
-      razorpayOrderId: string;
-      razorpayPaymentId: string;
-      processedAt: string;
-    };
-  };
-  hotelProfile: {
-    id: string;
-    hotelName: string;
+  createdAt: string;
+  specialRequests?: string;
+  guests: Array<{
+    firstName: string;
+    lastName: string;
+    age?: number;
+    isPrimaryGuest: boolean;
+    specialRequests?: string;
+    idProofType?: string;
+    idProofNumber?: string;
+  }>;
+  hotel: {
+    name: string;
     category: string;
-    checkInTime: string;
-    checkOutTime: string;
-    vendor: {
-      businessName: string;
-      businessAddress: string;
-      contactNumbers: string[];
-      email: string;
-    };
+    address: string;
+    contactNumbers: string[];
   };
   room: {
-    id: string;
-    roomType: string;
-    roomNumber: string;
+    type: string;
+    number: string;
     capacity: number;
     amenities: string[];
   };
-  guestDetails: {
-    primaryGuest: {
-      name: string;
-      phone: string;
-      email: string;
-    };
-    additionalGuests: Array<{
-      name: string;
-      age?: number;
-    }>;
+  customer: {
+    phoneNumber: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    emergencyContact?: string;
+    idProofType?: string;
+    idProofNumber?: string;
   };
-  policies: {
-    cancellationPolicy: string;
-    checkInPolicy: string;
-    childPolicy: string;
+  payment?: {
+    paymentStatus: string;
+    paymentMethod: string;
+    totalAmount: number;
+    processedAt: string;
   };
-  actions: {
-    canCancel: boolean;
-    canModify: boolean;
-    canDownloadInvoice: boolean;
+  vendor: {
+    businessName: string;
+    contactNumbers: string[];
   };
-  createdAt: string;
-  updatedAt: string;
 }
 
 const BACKEND_URL =
@@ -79,17 +61,46 @@ const BACKEND_URL =
 
 export default function BookingDetailsPage() {
   const params = useParams();
+  const router = useRouter();
   const bookingId = params.id as string;
 
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
 
-  useEffect(() => {
-    fetchBookingDetails();
-  }, [bookingId]);
+  // Helper function to handle authentication errors
+  const handleAuthError = (error: unknown) => {
+    if (
+      error instanceof Error &&
+      (error.message.includes("No access token") ||
+        error.message.includes("Authentication failed") ||
+        error.message.includes("Unable to refresh token"))
+    ) {
+      // Clear any loading states and redirect
+      setLoading(false);
+      setCancelling(false);
+      
+      // Store current URL as return URL
+      const returnUrl = window.location.pathname + window.location.search;
+      AuthService.setReturnUrl(returnUrl);
+      
+      router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
+      return true;
+    }
+    return false;
+  };
 
-  const fetchBookingDetails = async () => {
+  useEffect(() => {
+    // Check if user is authenticated before fetching data
+    if (!AuthService.isAuthenticated()) {
+      const returnUrl = window.location.pathname + window.location.search;
+      AuthService.setReturnUrl(returnUrl);
+      router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
+      return;
+    }
+    
+    fetchBookingDetails();
+  }, [bookingId, router]);  const fetchBookingDetails = async () => {
     try {
       const response = await AuthService.authenticatedFetch(
         `${BACKEND_URL}/api/hotels/bookings/${bookingId}`
@@ -101,6 +112,11 @@ export default function BookingDetailsPage() {
       }
     } catch (error) {
       console.error("Error fetching booking details:", error);
+
+      // Handle authentication errors
+      if (handleAuthError(error)) {
+        return;
+      }
     } finally {
       setLoading(false);
     }
@@ -140,6 +156,12 @@ export default function BookingDetailsPage() {
       }
     } catch (error) {
       console.error("Error cancelling booking:", error);
+
+      // Handle authentication errors
+      if (handleAuthError(error)) {
+        return;
+      }
+
       alert("Failed to cancel booking. Please try again.");
     } finally {
       setCancelling(false);
@@ -194,6 +216,18 @@ export default function BookingDetailsPage() {
   };
 
   if (loading) {
+    return (
+      <div className='min-h-screen flex items-center justify-center'>
+        <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600'></div>
+      </div>
+    );
+  }
+
+  // Double-check authentication status before rendering
+  if (!AuthService.isAuthenticated()) {
+    const returnUrl = window.location.pathname + window.location.search;
+    AuthService.setReturnUrl(returnUrl);
+    router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
     return (
       <div className='min-h-screen flex items-center justify-center'>
         <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600'></div>
@@ -259,7 +293,7 @@ export default function BookingDetailsPage() {
             </Link>
             <span className='mx-2'>/</span>
             <span className='text-gray-900'>
-              Booking #{booking.id.slice(-8)}
+              {booking?.bookingRef || "Loading..."}
             </span>
           </nav>
         </div>
@@ -271,14 +305,16 @@ export default function BookingDetailsPage() {
           <div className='flex justify-between items-start mb-4'>
             <div>
               <h1 className='text-3xl font-bold text-gray-900 mb-2'>
-                {booking.hotelProfile.hotelName}
+                {booking.hotel?.name || "Hotel Name"}
               </h1>
               <p className='text-gray-600'>
-                📍 {booking.hotelProfile.vendor.businessAddress}
+                📍 {booking.hotel?.address || "Address not available"}
               </p>
               <div className='mt-2'>
-                <span className='text-sm text-gray-500'>Booking ID: </span>
-                <span className='font-mono text-sm'>{booking.id}</span>
+                <span className='text-sm text-gray-500'>
+                  Booking Reference:{" "}
+                </span>
+                <span className='font-mono text-sm'>{booking.bookingRef}</span>
               </div>
             </div>
 
@@ -290,9 +326,9 @@ export default function BookingDetailsPage() {
               >
                 {booking.status}
               </span>
-              {booking.booking.payment && (
+              {booking.payment && (
                 <div className='mt-2 text-sm text-gray-600'>
-                  Payment: {booking.booking.payment.paymentStatus}
+                  Payment: {booking.payment.paymentStatus}
                 </div>
               )}
             </div>
@@ -300,7 +336,7 @@ export default function BookingDetailsPage() {
 
           {/* Quick Actions */}
           <div className='flex space-x-3'>
-            {booking.actions.canCancel && isUpcoming() && (
+            {isUpcoming() && (
               <button
                 onClick={handleCancelBooking}
                 disabled={cancelling}
@@ -310,11 +346,9 @@ export default function BookingDetailsPage() {
               </button>
             )}
 
-            {booking.actions.canDownloadInvoice && (
-              <button className='bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-medium'>
-                Download Invoice
-              </button>
-            )}
+            <button className='bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-medium'>
+              Download Invoice
+            </button>
 
             <button className='bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium'>
               Contact Hotel
@@ -336,7 +370,7 @@ export default function BookingDetailsPage() {
                     {formatDate(booking.checkInDate)}
                   </div>
                   <div className='text-sm text-gray-600'>
-                    {booking.hotelProfile.checkInTime}
+                    Check-in time not available
                   </div>
                 </div>
 
@@ -346,7 +380,7 @@ export default function BookingDetailsPage() {
                     {formatDate(booking.checkOutDate)}
                   </div>
                   <div className='text-sm text-gray-600'>
-                    {booking.hotelProfile.checkOutTime}
+                    Check-out time not available
                   </div>
                 </div>
 
@@ -369,24 +403,26 @@ export default function BookingDetailsPage() {
               <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                 <div>
                   <h3 className='font-semibold mb-2'>Room Type</h3>
-                  <p>{booking.room.roomType}</p>
+                  <p>{booking.room?.type || "Room type not available"}</p>
 
                   <h3 className='font-semibold mb-2 mt-4'>Room Number</h3>
-                  <p>{booking.room.roomNumber}</p>
+                  <p>{booking.room?.number || "Room number not available"}</p>
 
                   <h3 className='font-semibold mb-2 mt-4'>Capacity</h3>
-                  <p>{booking.room.capacity} guests</p>
+                  <p>
+                    {booking.room?.capacity || "Capacity not available"} guests
+                  </p>
                 </div>
 
                 <div>
                   <h3 className='font-semibold mb-2'>Room Amenities</h3>
                   <div className='grid grid-cols-2 gap-2'>
-                    {booking.room.amenities.map((amenity) => (
+                    {booking.room?.amenities?.map((amenity) => (
                       <div key={amenity} className='flex items-center'>
                         <span className='text-green-500 mr-2'>✓</span>
                         <span className='text-sm capitalize'>{amenity}</span>
                       </div>
-                    ))}
+                    )) || <p className='text-gray-500'>No amenities listed</p>}
                   </div>
                 </div>
               </div>
@@ -397,53 +433,110 @@ export default function BookingDetailsPage() {
               <h2 className='text-xl font-bold mb-4'>Guest Details</h2>
 
               <div className='space-y-4'>
+                {booking.guests?.map((guest, index) => (
+                  <div key={index}>
+                    <h3 className='font-semibold mb-2'>
+                      {guest.isPrimaryGuest
+                        ? "Primary Guest"
+                        : `Guest ${index + 1}`}
+                      {guest.isPrimaryGuest && (
+                        <span className='ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full'>
+                          Primary
+                        </span>
+                      )}
+                    </h3>
+                    <div className='bg-gray-50 rounded-lg p-4'>
+                      <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                        <div>
+                          <span className='text-sm text-gray-600'>Name</span>
+                          <div className='font-medium'>
+                            {guest.firstName} {guest.lastName}
+                          </div>
+                        </div>
+                        {guest.age && (
+                          <div>
+                            <span className='text-sm text-gray-600'>Age</span>
+                            <div className='font-medium'>{guest.age}</div>
+                          </div>
+                        )}
+                        {guest.idProofType && (
+                          <div>
+                            <span className='text-sm text-gray-600'>
+                              ID Proof
+                            </span>
+                            <div className='font-medium'>
+                              {guest.idProofType}
+                              {guest.idProofNumber && (
+                                <div className='text-sm text-gray-500'>
+                                  {guest.idProofNumber}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {guest.specialRequests && (
+                          <div className='md:col-span-3'>
+                            <span className='text-sm text-gray-600'>
+                              Special Requests
+                            </span>
+                            <div className='font-medium'>
+                              {guest.specialRequests}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Customer Details */}
                 <div>
-                  <h3 className='font-semibold mb-2'>Primary Guest</h3>
+                  <h3 className='font-semibold mb-2'>
+                    Customer Contact Information
+                  </h3>
                   <div className='bg-gray-50 rounded-lg p-4'>
                     <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
                       <div>
                         <span className='text-sm text-gray-600'>Name</span>
                         <div className='font-medium'>
-                          {booking.guestDetails.primaryGuest.name}
+                          {booking.customer.firstName}{" "}
+                          {booking.customer.lastName}
                         </div>
                       </div>
                       <div>
                         <span className='text-sm text-gray-600'>Phone</span>
                         <div className='font-medium'>
-                          {booking.guestDetails.primaryGuest.phone}
+                          {booking.customer.phoneNumber}
                         </div>
                       </div>
                       <div>
                         <span className='text-sm text-gray-600'>Email</span>
                         <div className='font-medium'>
-                          {booking.guestDetails.primaryGuest.email}
+                          {booking.customer.email}
                         </div>
                       </div>
+                      {booking.customer.emergencyContact && (
+                        <div>
+                          <span className='text-sm text-gray-600'>
+                            Emergency Contact
+                          </span>
+                          <div className='font-medium'>
+                            {booking.customer.emergencyContact}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {booking.guestDetails.additionalGuests.length > 0 && (
+                {/* Special Requests */}
+                {booking.specialRequests && (
                   <div>
-                    <h3 className='font-semibold mb-2'>Additional Guests</h3>
-                    <div className='space-y-2'>
-                      {booking.guestDetails.additionalGuests.map(
-                        (guest, index) => (
-                          <div
-                            key={index}
-                            className='bg-gray-50 rounded-lg p-3'
-                          >
-                            <div className='flex justify-between items-center'>
-                              <span className='font-medium'>{guest.name}</span>
-                              {guest.age && (
-                                <span className='text-sm text-gray-600'>
-                                  Age: {guest.age}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      )}
+                    <h3 className='font-semibold mb-2'>Special Requests</h3>
+                    <div className='bg-gray-50 rounded-lg p-4'>
+                      <div className='font-medium'>
+                        {booking.specialRequests}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -458,21 +551,21 @@ export default function BookingDetailsPage() {
                 <div>
                   <h3 className='font-semibold mb-2'>Cancellation Policy</h3>
                   <p className='text-sm text-gray-600'>
-                    {booking.policies.cancellationPolicy}
+                    Policy information not available
                   </p>
                 </div>
 
                 <div>
                   <h3 className='font-semibold mb-2'>Check-in Policy</h3>
                   <p className='text-sm text-gray-600'>
-                    {booking.policies.checkInPolicy}
+                    Policy information not available
                   </p>
                 </div>
 
                 <div>
                   <h3 className='font-semibold mb-2'>Child Policy</h3>
                   <p className='text-sm text-gray-600'>
-                    {booking.policies.childPolicy}
+                    Policy information not available
                   </p>
                 </div>
               </div>
@@ -504,18 +597,14 @@ export default function BookingDetailsPage() {
                 </div>
               </div>
 
-              {booking.booking.payment && (
+              {booking.payment && (
                 <div className='mt-4 pt-4 border-t'>
                   <h3 className='font-semibold mb-2'>Payment Details</h3>
                   <div className='text-sm space-y-1'>
-                    <div>Method: {booking.booking.payment.paymentMethod}</div>
+                    <div>Method: {booking.payment.paymentMethod}</div>
+                    <div>Status: {booking.payment.paymentStatus}</div>
                     <div>
-                      Transaction ID:{" "}
-                      {booking.booking.payment.razorpayPaymentId}
-                    </div>
-                    <div>
-                      Processed:{" "}
-                      {formatDateTime(booking.booking.payment.processedAt)}
+                      Processed: {formatDateTime(booking.payment.processedAt)}
                     </div>
                   </div>
                 </div>
@@ -529,25 +618,27 @@ export default function BookingDetailsPage() {
               <div className='space-y-3'>
                 <div>
                   <h3 className='font-semibold'>
-                    {booking.hotelProfile.vendor.businessName}
+                    {booking.vendor?.businessName || "Hotel Contact"}
                   </h3>
                 </div>
 
                 <div>
                   <span className='text-sm text-gray-600'>Phone</span>
                   <div>
-                    {booking.hotelProfile.vendor.contactNumbers.join(", ")}
+                    {booking.vendor?.contactNumbers?.join(", ") ||
+                      booking.hotel?.contactNumbers?.join(", ") ||
+                      "Phone not available"}
                   </div>
                 </div>
 
                 <div>
                   <span className='text-sm text-gray-600'>Email</span>
-                  <div>{booking.hotelProfile.vendor.email}</div>
+                  <div>Email not available</div>
                 </div>
 
                 <div>
                   <span className='text-sm text-gray-600'>Address</span>
-                  <div>{booking.hotelProfile.vendor.businessAddress}</div>
+                  <div>{booking.hotel?.address || "Address not available"}</div>
                 </div>
               </div>
             </div>
@@ -562,18 +653,16 @@ export default function BookingDetailsPage() {
                   <span>{formatDateTime(booking.createdAt)}</span>
                 </div>
 
-                {booking.booking.payment && (
+                {booking.payment && (
                   <div className='flex justify-between'>
                     <span>Payment completed</span>
-                    <span>
-                      {formatDateTime(booking.booking.payment.processedAt)}
-                    </span>
+                    <span>{formatDateTime(booking.payment.processedAt)}</span>
                   </div>
                 )}
 
                 <div className='flex justify-between'>
                   <span>Last updated</span>
-                  <span>{formatDateTime(booking.updatedAt)}</span>
+                  <span>{formatDateTime(booking.createdAt)}</span>
                 </div>
               </div>
             </div>

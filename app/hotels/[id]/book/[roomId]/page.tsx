@@ -14,17 +14,25 @@ interface BookingData {
   checkInDate: string;
   checkOutDate: string;
   numberOfGuests: number;
-  guestDetails: {
-    primaryGuest: {
-      name: string;
-      phone: string;
-      email: string;
-    };
-    additionalGuests: Array<{
-      name: string;
-      age?: number;
-    }>;
+  userDetails: {
+    firstName: string;
+    lastName: string;
+    email?: string;
+    dateOfBirth?: string;
+    address?: string;
+    emergencyContact?: string;
+    idProofType?: string;
+    idProofNumber?: string;
   };
+  guestDetails: Array<{
+    firstName: string;
+    lastName: string;
+    age?: number;
+    idProofType?: string;
+    idProofNumber?: string;
+    isPrimaryGuest: boolean;
+    specialRequests?: string;
+  }>;
   specialRequests?: string;
 }
 
@@ -50,6 +58,14 @@ interface Room {
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "https://sojournbackend.onrender.com";
+
+const ID_PROOF_TYPES = [
+  { value: "AADHAR", label: "Aadhar Card" },
+  { value: "PASSPORT", label: "Passport" },
+  { value: "DRIVING_LICENSE", label: "Driving License" },
+  { value: "VOTER_ID", label: "Voter ID" },
+  { value: "PAN_CARD", label: "PAN Card" },
+];
 
 export default function BookingPage() {
   const params = useParams();
@@ -84,14 +100,17 @@ export default function BookingPage() {
     checkInDate: localCheckIn || checkIn,
     checkOutDate: localCheckOut || checkOut,
     numberOfGuests: guests,
-    guestDetails: {
-      primaryGuest: {
-        name: "",
-        phone: "",
-        email: "",
-      },
-      additionalGuests: [],
+    userDetails: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      dateOfBirth: "",
+      address: "",
+      emergencyContact: "",
+      idProofType: "",
+      idProofNumber: "",
     },
+    guestDetails: [],
     specialRequests: "",
   });
 
@@ -110,7 +129,13 @@ export default function BookingPage() {
 
     // Check authentication
     if (!AuthService.isAuthenticated()) {
-      router.push("/auth");
+      const returnUrl = `/hotels/${hotelId}/book/${roomId}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`;
+
+      // Store return URL in localStorage as backup
+      AuthService.setReturnUrl(returnUrl);
+
+      // Redirect to auth with return URL
+      router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
 
@@ -155,20 +180,44 @@ export default function BookingPage() {
   };
 
   const setupAdditionalGuests = () => {
-    if (guests > 1) {
-      const additionalGuests = Array.from({ length: guests - 1 }, () => ({
-        name: "",
-        age: undefined,
-      }));
+    const guestList: Array<{
+      firstName: string;
+      lastName: string;
+      age?: number;
+      idProofType?: string;
+      idProofNumber?: string;
+      isPrimaryGuest: boolean;
+      specialRequests?: string;
+    }> = [];
 
-      setFormData((prev) => ({
-        ...prev,
-        guestDetails: {
-          ...prev.guestDetails,
-          additionalGuests,
-        },
-      }));
+    // Add primary guest
+    guestList.push({
+      firstName: "",
+      lastName: "",
+      age: undefined,
+      idProofType: "",
+      idProofNumber: "",
+      isPrimaryGuest: true,
+      specialRequests: "",
+    });
+
+    // Add additional guests
+    for (let i = 1; i < guests; i++) {
+      guestList.push({
+        firstName: "",
+        lastName: "",
+        age: undefined,
+        idProofType: "",
+        idProofNumber: "",
+        isPrimaryGuest: false,
+        specialRequests: "",
+      });
     }
+
+    setFormData((prev) => ({
+      ...prev,
+      guestDetails: guestList,
+    }));
   };
 
   const calculatePricing = () => {
@@ -197,55 +246,76 @@ export default function BookingPage() {
   };
 
   const handleInputChange = (field: string, value: string) => {
-    if (field.startsWith("primaryGuest.")) {
-      const guestField = field.split(".")[1];
+    if (field.startsWith("userDetails.")) {
+      const userField = field.split(".")[1];
       setFormData((prev) => ({
         ...prev,
-        guestDetails: {
-          ...prev.guestDetails,
-          primaryGuest: {
-            ...prev.guestDetails.primaryGuest,
-            [guestField]: value,
-          },
+        userDetails: {
+          ...prev.userDetails,
+          [userField]: value,
         },
       }));
-    } else if (field.startsWith("additionalGuest.")) {
+    } else if (field.startsWith("guest.")) {
       const [, index, guestField] = field.split(".");
       const guestIndex = parseInt(index);
 
-      setFormData((prev) => ({
-        ...prev,
-        guestDetails: {
-          ...prev.guestDetails,
-          additionalGuests: prev.guestDetails.additionalGuests.map((guest, i) =>
-            i === guestIndex
-              ? {
-                  ...guest,
-                  [guestField]:
-                    guestField === "age" ? parseInt(value) || undefined : value,
-                }
-              : guest
-          ),
-        },
-      }));
+      setFormData((prev) => {
+        if (guestField === "isPrimaryGuest" && value === "true") {
+          // If setting a guest as primary, unset all others
+          return {
+            ...prev,
+            guestDetails: prev.guestDetails.map((guest, i) => ({
+              ...guest,
+              isPrimaryGuest: i === guestIndex,
+            })),
+          };
+        } else {
+          return {
+            ...prev,
+            guestDetails: prev.guestDetails.map((guest, i) =>
+              i === guestIndex
+                ? {
+                    ...guest,
+                    [guestField]:
+                      guestField === "age"
+                        ? parseInt(value) || undefined
+                        : guestField === "isPrimaryGuest"
+                        ? value === "true"
+                        : value,
+                  }
+                : guest
+            ),
+          };
+        }
+      });
     } else {
       setFormData((prev) => ({ ...prev, [field]: value }));
     }
   };
 
   const validateForm = () => {
-    const { primaryGuest, additionalGuests } = formData.guestDetails;
-
-    if (!primaryGuest.name || !primaryGuest.phone || !primaryGuest.email) {
-      alert("Please fill in all primary guest details");
+    // Validate user details
+    if (!formData.userDetails.firstName || !formData.userDetails.lastName) {
+      alert("Please fill in your first name and last name");
       return false;
     }
 
-    for (let i = 0; i < additionalGuests.length; i++) {
-      if (!additionalGuests[i].name) {
-        alert(`Please fill in the name for guest ${i + 2}`);
+    // Validate guest details
+    for (let i = 0; i < formData.guestDetails.length; i++) {
+      const guest = formData.guestDetails[i];
+      if (!guest.firstName || !guest.lastName) {
+        alert(`Please fill in the first name and last name for guest ${i + 1}`);
         return false;
       }
+    }
+
+    // Ensure exactly one primary guest
+    const primaryGuests = formData.guestDetails.filter(
+      (guest) => guest.isPrimaryGuest
+    );
+    if (primaryGuests.length !== 1) {
+      alert("Please select exactly one primary guest");
+      return false;
     }
 
     return true;
@@ -591,125 +661,323 @@ export default function BookingPage() {
                 </div>
               )}
 
-              {/* Primary Guest Details */}
+              {/* User Details */}
               <div className='space-y-4'>
                 <h3 className='text-lg font-medium text-gray-900'>
-                  Primary Guest Details
+                  Your Details
                 </h3>
 
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <div>
                     <label className='block text-sm font-medium text-gray-700 mb-1'>
-                      Full Name *
+                      First Name *
                     </label>
                     <input
                       type='text'
-                      value={formData.guestDetails.primaryGuest.name}
+                      value={formData.userDetails.firstName}
                       onChange={(e) =>
-                        handleInputChange("primaryGuest.name", e.target.value)
+                        handleInputChange(
+                          "userDetails.firstName",
+                          e.target.value
+                        )
                       }
                       className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
-                      placeholder='Enter full name'
+                      placeholder='Enter first name'
                     />
                   </div>
 
                   <div>
                     <label className='block text-sm font-medium text-gray-700 mb-1'>
-                      Phone Number *
+                      Last Name *
                     </label>
                     <input
-                      type='tel'
-                      value={formData.guestDetails.primaryGuest.phone}
+                      type='text'
+                      value={formData.userDetails.lastName}
                       onChange={(e) =>
-                        handleInputChange("primaryGuest.phone", e.target.value)
+                        handleInputChange(
+                          "userDetails.lastName",
+                          e.target.value
+                        )
                       }
                       className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
-                      placeholder='Enter phone number'
+                      placeholder='Enter last name'
                     />
                   </div>
 
-                  <div className='md:col-span-2'>
+                  <div>
                     <label className='block text-sm font-medium text-gray-700 mb-1'>
-                      Email Address *
+                      Email Address
                     </label>
                     <input
                       type='email'
-                      value={formData.guestDetails.primaryGuest.email}
+                      value={formData.userDetails.email}
                       onChange={(e) =>
-                        handleInputChange("primaryGuest.email", e.target.value)
+                        handleInputChange("userDetails.email", e.target.value)
                       }
                       className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
                       placeholder='Enter email address'
                     />
                   </div>
+
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      Date of Birth
+                    </label>
+                    <input
+                      type='date'
+                      value={formData.userDetails.dateOfBirth}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "userDetails.dateOfBirth",
+                          e.target.value
+                        )
+                      }
+                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
+                    />
+                  </div>
+
+                  <div className='md:col-span-2'>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      Address
+                    </label>
+                    <textarea
+                      value={formData.userDetails.address}
+                      onChange={(e) =>
+                        handleInputChange("userDetails.address", e.target.value)
+                      }
+                      rows={2}
+                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
+                      placeholder='Enter your address'
+                    />
+                  </div>
+
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      Emergency Contact
+                    </label>
+                    <input
+                      type='tel'
+                      value={formData.userDetails.emergencyContact}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "userDetails.emergencyContact",
+                          e.target.value
+                        )
+                      }
+                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
+                      placeholder='Emergency contact number'
+                    />
+                  </div>
+
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      ID Proof Type
+                    </label>
+                    <select
+                      value={formData.userDetails.idProofType}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "userDetails.idProofType",
+                          e.target.value
+                        )
+                      }
+                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
+                    >
+                      <option value=''>Select ID Proof Type</option>
+                      {ID_PROOF_TYPES.map((type) => (
+                        <option key={type.value} value={type.value}>
+                          {type.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {formData.userDetails.idProofType && (
+                    <div className='md:col-span-2'>
+                      <label className='block text-sm font-medium text-gray-700 mb-1'>
+                        ID Proof Number
+                      </label>
+                      <input
+                        type='text'
+                        value={formData.userDetails.idProofNumber}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "userDetails.idProofNumber",
+                            e.target.value
+                          )
+                        }
+                        className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
+                        placeholder={`Enter ${formData.userDetails.idProofType} number`}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Additional Guests */}
-              {formData.guestDetails.additionalGuests.length > 0 && (
-                <div className='space-y-4 mt-6'>
-                  <h3 className='text-lg font-medium text-gray-900'>
-                    Additional Guest Details
-                  </h3>
+              {/* Guest Details */}
+              <div className='space-y-4 mt-6'>
+                <h3 className='text-lg font-medium text-gray-900'>
+                  Guest Details
+                </h3>
 
-                  {formData.guestDetails.additionalGuests.map(
-                    (guest, index) => (
-                      <div
-                        key={index}
-                        className='bg-gray-50 border border-gray-200 p-4'
-                      >
-                        <h4 className='font-medium mb-3 text-gray-900'>
-                          Guest {index + 2}
-                        </h4>
-                        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                          <div>
-                            <label className='block text-sm font-medium text-gray-700 mb-1'>
-                              Full Name *
-                            </label>
-                            <input
-                              type='text'
-                              value={guest.name}
-                              onChange={(e) =>
-                                handleInputChange(
-                                  `additionalGuest.${index}.name`,
-                                  e.target.value
-                                )
-                              }
-                              className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
-                              placeholder='Enter full name'
-                            />
-                          </div>
+                {formData.guestDetails.map((guest, index) => (
+                  <div
+                    key={index}
+                    className='bg-gray-50 border border-gray-200 p-4'
+                  >
+                    <div className='flex items-center justify-between mb-3'>
+                      <h4 className='font-medium text-gray-900'>
+                        Guest {index + 1}
+                      </h4>
+                      <label className='flex items-center'>
+                        <input
+                          type='radio'
+                          name='primaryGuest'
+                          checked={guest.isPrimaryGuest}
+                          onChange={(e) =>
+                            handleInputChange(
+                              `guest.${index}.isPrimaryGuest`,
+                              e.target.checked ? "true" : "false"
+                            )
+                          }
+                          className='mr-2'
+                        />
+                        <span className='text-sm text-gray-600'>
+                          Primary Guest
+                        </span>
+                      </label>
+                    </div>
 
-                          <div>
-                            <label className='block text-sm font-medium text-gray-700 mb-1'>
-                              Age (Optional)
-                            </label>
-                            <input
-                              type='number'
-                              value={guest.age || ""}
-                              onChange={(e) =>
-                                handleInputChange(
-                                  `additionalGuest.${index}.age`,
-                                  e.target.value
-                                )
-                              }
-                              className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
-                              placeholder='Enter age'
-                              min='1'
-                              max='120'
-                            />
-                          </div>
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                      <div>
+                        <label className='block text-sm font-medium text-gray-700 mb-1'>
+                          First Name *
+                        </label>
+                        <input
+                          type='text'
+                          value={guest.firstName}
+                          onChange={(e) =>
+                            handleInputChange(
+                              `guest.${index}.firstName`,
+                              e.target.value
+                            )
+                          }
+                          className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
+                          placeholder='Enter first name'
+                        />
+                      </div>
+
+                      <div>
+                        <label className='block text-sm font-medium text-gray-700 mb-1'>
+                          Last Name *
+                        </label>
+                        <input
+                          type='text'
+                          value={guest.lastName}
+                          onChange={(e) =>
+                            handleInputChange(
+                              `guest.${index}.lastName`,
+                              e.target.value
+                            )
+                          }
+                          className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
+                          placeholder='Enter last name'
+                        />
+                      </div>
+
+                      <div>
+                        <label className='block text-sm font-medium text-gray-700 mb-1'>
+                          Age
+                        </label>
+                        <input
+                          type='number'
+                          value={guest.age || ""}
+                          onChange={(e) =>
+                            handleInputChange(
+                              `guest.${index}.age`,
+                              e.target.value
+                            )
+                          }
+                          className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
+                          placeholder='Enter age'
+                          min='1'
+                          max='120'
+                        />
+                      </div>
+
+                      <div>
+                        <label className='block text-sm font-medium text-gray-700 mb-1'>
+                          ID Proof Type
+                        </label>
+                        <select
+                          value={guest.idProofType || ""}
+                          onChange={(e) =>
+                            handleInputChange(
+                              `guest.${index}.idProofType`,
+                              e.target.value
+                            )
+                          }
+                          className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
+                        >
+                          <option value=''>Select ID Proof Type</option>
+                          {ID_PROOF_TYPES.map((type) => (
+                            <option key={type.value} value={type.value}>
+                              {type.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {guest.idProofType && (
+                        <div className='md:col-span-2'>
+                          <label className='block text-sm font-medium text-gray-700 mb-1'>
+                            ID Proof Number
+                          </label>
+                          <input
+                            type='text'
+                            value={guest.idProofNumber || ""}
+                            onChange={(e) =>
+                              handleInputChange(
+                                `guest.${index}.idProofNumber`,
+                                e.target.value
+                              )
+                            }
+                            className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
+                            placeholder={`Enter ${guest.idProofType} number`}
+                          />
+                        </div>
+                      )}
+
+                      <div className='md:col-span-2'>
+                        <label className='block text-sm font-medium text-gray-700 mb-1'>
+                          Special Requests
+                        </label>
+                        <textarea
+                          value={guest.specialRequests || ""}
+                          onChange={(e) =>
+                            handleInputChange(
+                              `guest.${index}.specialRequests`,
+                              e.target.value
+                            )
+                          }
+                          rows={2}
+                          maxLength={200}
+                          className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
+                          placeholder='Any special requests for this guest (max 200 characters)'
+                        />
+                        <div className='text-xs text-gray-500 mt-1'>
+                          {(guest.specialRequests || "").length}/200 characters
                         </div>
                       </div>
-                    )
-                  )}
-                </div>
-              )}
+                    </div>
+                  </div>
+                ))}
+              </div>
 
               {/* Special Requests */}
               <div className='space-y-4 mt-6'>
                 <h3 className='text-lg font-medium text-gray-900'>
-                  Special Requests (Optional)
+                  General Special Requests (Optional)
                 </h3>
                 <textarea
                   value={formData.specialRequests}
@@ -717,9 +985,13 @@ export default function BookingPage() {
                     handleInputChange("specialRequests", e.target.value)
                   }
                   rows={3}
+                  maxLength={500}
                   className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
-                  placeholder='Any special requests or preferences...'
+                  placeholder='Any special requests or preferences for your entire stay (max 500 characters)'
                 />
+                <div className='text-xs text-gray-500'>
+                  {(formData.specialRequests || "").length}/500 characters
+                </div>
               </div>
             </div>
           </div>

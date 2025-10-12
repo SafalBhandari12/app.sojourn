@@ -16,6 +16,27 @@ export class AuthService {
   private static readonly ACCESS_TOKEN_KEY = "accessToken";
   private static readonly REFRESH_TOKEN_KEY = "refreshToken";
   private static readonly USER_KEY = "user";
+  private static readonly RETURN_URL_KEY = "returnUrl";
+
+  // Store return URL for post-authentication redirect
+  static setReturnUrl(url: string): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(this.RETURN_URL_KEY, url);
+  }
+
+  // Get and clear return URL
+  static getAndClearReturnUrl(): string | null {
+    if (typeof window === "undefined") return null;
+    const url = localStorage.getItem(this.RETURN_URL_KEY);
+    localStorage.removeItem(this.RETURN_URL_KEY);
+    return url;
+  }
+
+  // Clear return URL
+  static clearReturnUrl(): void {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(this.RETURN_URL_KEY);
+  }
 
   // Check if user is authenticated
   static isAuthenticated(): boolean {
@@ -67,6 +88,7 @@ export class AuthService {
     localStorage.removeItem(this.ACCESS_TOKEN_KEY);
     localStorage.removeItem(this.REFRESH_TOKEN_KEY);
     localStorage.removeItem(this.USER_KEY);
+    localStorage.removeItem(this.RETURN_URL_KEY);
   }
 
   // Check if token is expired (basic check based on JWT structure)
@@ -125,6 +147,8 @@ export class AuthService {
       accessToken = await this.refreshAccessToken();
       if (!accessToken) {
         this.clearAuthData();
+        // Store current URL as return URL before redirecting
+        this.setReturnUrl(window.location.pathname + window.location.search);
         window.location.href = "/auth";
         throw new Error("Unable to refresh token");
       }
@@ -157,6 +181,8 @@ export class AuthService {
         });
       } else {
         this.clearAuthData();
+        // Store current URL as return URL before redirecting
+        this.setReturnUrl(window.location.pathname + window.location.search);
         window.location.href = "/auth";
         throw new Error("Authentication failed");
       }

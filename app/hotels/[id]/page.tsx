@@ -157,10 +157,13 @@ export default function HotelDetailsPage() {
   const handleBookRoom = (room: RoomAvailability) => {
     // Check if user is authenticated
     if (!AuthService.isAuthenticated()) {
-      // Redirect to auth with return URL
-      router.push(
-        `/auth?returnUrl=/hotels/${hotelId}/book/${room.id}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`
-      );
+      const returnUrl = `/hotels/${hotelId}/book/${room.id}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`;
+
+      // Store return URL in localStorage as backup
+      AuthService.setReturnUrl(returnUrl);
+
+      // Redirect to auth with return URL as query param (primary method)
+      router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
 

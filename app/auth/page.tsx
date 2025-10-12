@@ -34,7 +34,7 @@ const BACKEND_URL =
 export default function AuthPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnUrl = searchParams.get("returnUrl");
+  const returnUrlFromParams = searchParams.get("returnUrl");
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
@@ -43,12 +43,24 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [timeout, setTimeout] = useState<number>(0);
 
+  // Determine the final return URL (from params, localStorage, or default)
+  const getReturnUrl = () => {
+    if (returnUrlFromParams) {
+      // Clear any stored URL since we're using the param one
+      AuthService.clearReturnUrl();
+      return returnUrlFromParams;
+    }
+    const storedUrl = AuthService.getAndClearReturnUrl();
+    return storedUrl || "/dashboard";
+  };
+
   // Check if user is already authenticated
   useEffect(() => {
     if (AuthService.isAuthenticated()) {
-      router.push(returnUrl || "/dashboard");
+      const redirectUrl = getReturnUrl();
+      router.push(redirectUrl);
     }
-  }, [returnUrl, router]);
+  }, [router]);
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,7 +125,7 @@ export default function AuthPage() {
         );
 
         // Redirect to returnUrl if available, otherwise to dashboard
-        const redirectUrl = returnUrl || "/dashboard";
+        const redirectUrl = getReturnUrl();
         window.location.href = redirectUrl;
       } else {
         setError(data.message || "Invalid OTP");
