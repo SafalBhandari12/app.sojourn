@@ -246,7 +246,8 @@ export default function HotelsPage() {
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, checkIn: e.target.value }))
                 }
-                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all text-black'
+                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all text-black placeholder-black'
+                style={{ color: "black" }}
               />
             </div>
 
@@ -261,6 +262,7 @@ export default function HotelsPage() {
                   setFilters((prev) => ({ ...prev, checkOut: e.target.value }))
                 }
                 className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all text-black'
+                style={{ color: "black" }}
               />
             </div>
 
@@ -526,12 +528,6 @@ export default function HotelsPage() {
                                 {hotel.avgRating
                                   ? getRatingStars(hotel.avgRating)
                                   : "☆☆☆☆☆"}
-                              </span>
-                              <span className='text-sm text-gray-600'>
-                                {hotel.avgRating
-                                  ? `${hotel.avgRating}/5`
-                                  : "No rating"}{" "}
-                                ({hotel.totalReviews || 0} reviews)
                               </span>
                             </div>
 

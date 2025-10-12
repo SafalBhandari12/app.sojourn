@@ -356,22 +356,6 @@ export default function HotelDetailsPage() {
                   </span>
                 </div>
 
-                <div className='flex items-center gap-6 mb-4'>
-                  <div className='flex items-center'>
-                    <span className='text-yellow-400 text-xl mr-2'>
-                      {hotel.avgRating
-                        ? getRatingStars(hotel.avgRating)
-                        : "☆☆☆☆☆"}
-                    </span>
-                    <span className='text-gray-200'>
-                      {hotel.avgRating ? `${hotel.avgRating}/5` : "No rating"}
-                    </span>
-                    <span className='text-gray-400 ml-2'>
-                      ({hotel.totalReviews || 0} reviews)
-                    </span>
-                  </div>
-                </div>
-
                 <div className='flex items-center text-gray-300'>
                   <svg
                     className='w-5 h-5 mr-2'
@@ -439,7 +423,7 @@ export default function HotelDetailsPage() {
                     value={checkIn}
                     onChange={(e) => setCheckIn(e.target.value)}
                     min={new Date().toISOString().split("T")[0]}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all bg-white shadow-sm'
+                    className='w-full px-4 py-3 border border-gray-300 text-black rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all bg-white shadow-sm'
                   />
                 </div>
                 <div>
@@ -451,7 +435,7 @@ export default function HotelDetailsPage() {
                     value={checkOut}
                     onChange={(e) => setCheckOut(e.target.value)}
                     min={checkIn || new Date().toISOString().split("T")[0]}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all bg-white shadow-sm'
+                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 text-black focus:border-gray-500 transition-all bg-white shadow-sm'
                   />
                 </div>
                 <div>
@@ -461,7 +445,7 @@ export default function HotelDetailsPage() {
                   <select
                     value={guests}
                     onChange={(e) => setGuests(parseInt(e.target.value))}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all bg-white shadow-sm'
+                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all bg-white shadow-sm text-black'
                   >
                     {[1, 2, 3, 4, 5, 6].map((num) => (
                       <option key={num} value={num}>
@@ -474,10 +458,10 @@ export default function HotelDetailsPage() {
                   <button
                     onClick={checkAvailability}
                     disabled={!checkIn || !checkOut || availabilityLoading}
-                    className='w-full bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                    className='w-full bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 '
                   >
                     {availabilityLoading ? (
-                      <span className='flex items-center justify-center'>
+                      <span className='flex items-center justify-center text-white'>
                         <svg
                           className='animate-spin -ml-1 mr-3 h-5 w-5 text-white'
                           xmlns='http://www.w3.org/2000/svg'
