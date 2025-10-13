@@ -51,7 +51,7 @@ export default function AuthPage() {
       return returnUrlFromParams;
     }
     const storedUrl = AuthService.getAndClearReturnUrl();
-    return storedUrl || "/dashboard";
+    return storedUrl || "/";
   };
 
   // Check if user is already authenticated

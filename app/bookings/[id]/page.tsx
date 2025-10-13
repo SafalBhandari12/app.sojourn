@@ -79,11 +79,11 @@ export default function BookingDetailsPage() {
       // Clear any loading states and redirect
       setLoading(false);
       setCancelling(false);
-      
+
       // Store current URL as return URL
       const returnUrl = window.location.pathname + window.location.search;
       AuthService.setReturnUrl(returnUrl);
-      
+
       router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
       return true;
     }
@@ -98,9 +98,10 @@ export default function BookingDetailsPage() {
       router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
-    
+
     fetchBookingDetails();
-  }, [bookingId, router]);  const fetchBookingDetails = async () => {
+  }, [bookingId, router]);
+  const fetchBookingDetails = async () => {
     try {
       const response = await AuthService.authenticatedFetch(
         `${BACKEND_URL}/api/hotels/bookings/${bookingId}`
@@ -259,23 +260,22 @@ export default function BookingDetailsPage() {
             <Link href='/' className='text-2xl font-bold text-blue-600'>
               Sojourn
             </Link>
-            <nav className='hidden md:flex space-x-8'>
-              <Link
-                href='/hotels'
-                className='text-gray-700 hover:text-blue-600'
-              >
-                Hotels
-              </Link>
+
+            {/* Simple navigation for authenticated users */}
+            <div className='flex items-center space-x-4'>
               <Link href='/bookings' className='text-blue-600 font-medium'>
                 My Bookings
               </Link>
-              <Link
-                href='/dashboard'
-                className='text-gray-700 hover:text-blue-600'
+              <button
+                onClick={() => {
+                  AuthService.clearAuthData();
+                  window.location.href = "/";
+                }}
+                className='text-gray-700 hover:text-red-600 font-medium transition-colors'
               >
-                Dashboard
-              </Link>
-            </nav>
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -307,11 +307,11 @@ export default function BookingDetailsPage() {
               <h1 className='text-3xl font-bold text-gray-900 mb-2'>
                 {booking.hotel?.name || "Hotel Name"}
               </h1>
-              <p className='text-gray-600'>
+              <p className='text-gray-800'>
                 📍 {booking.hotel?.address || "Address not available"}
               </p>
               <div className='mt-2'>
-                <span className='text-sm text-gray-500'>
+                <span className='text-sm text-gray-800'>
                   Booking Reference:{" "}
                 </span>
                 <span className='font-mono text-sm'>{booking.bookingRef}</span>
@@ -327,7 +327,7 @@ export default function BookingDetailsPage() {
                 {booking.status}
               </span>
               {booking.payment && (
-                <div className='mt-2 text-sm text-gray-600'>
+                <div className='mt-2 text-sm text-gray-700'>
                   Payment: {booking.payment.paymentStatus}
                 </div>
               )}
@@ -335,25 +335,7 @@ export default function BookingDetailsPage() {
           </div>
 
           {/* Quick Actions */}
-          <div className='flex space-x-3'>
-            {isUpcoming() && (
-              <button
-                onClick={handleCancelBooking}
-                disabled={cancelling}
-                className='bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium disabled:opacity-50'
-              >
-                {cancelling ? "Cancelling..." : "Cancel Booking"}
-              </button>
-            )}
-
-            <button className='bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-medium'>
-              Download Invoice
-            </button>
-
-            <button className='bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium'>
-              Contact Hotel
-            </button>
-          </div>
+          <div className='mb-4' />
         </div>
 
         <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
@@ -361,68 +343,92 @@ export default function BookingDetailsPage() {
           <div className='lg:col-span-2 space-y-6'>
             {/* Stay Details */}
             <div className='bg-white rounded-lg shadow-md p-6'>
-              <h2 className='text-xl font-bold mb-4'>Stay Details</h2>
+              <h2 className='text-xl font-bold mb-4 text-gray-900'>
+                Stay Details
+              </h2>
 
               <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                 <div>
-                  <h3 className='font-semibold mb-3'>Check-in</h3>
-                  <div className='text-lg'>
+                  <h3 className='font-semibold mb-3 text-gray-800'>Check-in</h3>
+                  <div className='text-lg text-gray-900'>
                     {formatDate(booking.checkInDate)}
                   </div>
-                  <div className='text-sm text-gray-600'>
+                  <div className='text-sm text-gray-800'>
                     Check-in time not available
                   </div>
                 </div>
 
                 <div>
-                  <h3 className='font-semibold mb-3'>Check-out</h3>
-                  <div className='text-lg'>
+                  <h3 className='font-semibold mb-3 text-gray-800'>
+                    Check-out
+                  </h3>
+                  <div className='text-lg text-gray-900'>
                     {formatDate(booking.checkOutDate)}
                   </div>
-                  <div className='text-sm text-gray-600'>
+                  <div className='text-sm text-gray-800'>
                     Check-out time not available
                   </div>
                 </div>
 
                 <div>
-                  <h3 className='font-semibold mb-3'>Duration</h3>
-                  <div className='text-lg'>{calculateNights()} nights</div>
+                  <h3 className='font-semibold mb-3 text-gray-800'>Duration</h3>
+                  <div className='text-lg text-gray-900'>
+                    {calculateNights()} nights
+                  </div>
                 </div>
 
                 <div>
-                  <h3 className='font-semibold mb-3'>Guests</h3>
-                  <div className='text-lg'>{booking.numberOfGuests} guests</div>
+                  <h3 className='font-semibold mb-3 text-gray-800'>Guests</h3>
+                  <div className='text-lg text-gray-900'>
+                    {booking.numberOfGuests} guests
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Room Details */}
             <div className='bg-white rounded-lg shadow-md p-6'>
-              <h2 className='text-xl font-bold mb-4'>Room Details</h2>
+              <h2 className='text-xl font-bold mb-4 text-gray-900'>
+                Room Details
+              </h2>
 
               <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                 <div>
-                  <h3 className='font-semibold mb-2'>Room Type</h3>
-                  <p>{booking.room?.type || "Room type not available"}</p>
+                  <h3 className='font-semibold mb-2 text-gray-800'>
+                    Room Type
+                  </h3>
+                  <p className='text-gray-900'>
+                    {booking.room?.type || "Room type not available"}
+                  </p>
 
-                  <h3 className='font-semibold mb-2 mt-4'>Room Number</h3>
-                  <p>{booking.room?.number || "Room number not available"}</p>
+                  <h3 className='font-semibold mb-2 mt-4 text-gray-800'>
+                    Room Number
+                  </h3>
+                  <p className='text-gray-900'>
+                    {booking.room?.number || "Room number not available"}
+                  </p>
 
-                  <h3 className='font-semibold mb-2 mt-4'>Capacity</h3>
-                  <p>
+                  <h3 className='font-semibold mb-2 mt-4 text-gray-800'>
+                    Capacity
+                  </h3>
+                  <p className='text-gray-900'>
                     {booking.room?.capacity || "Capacity not available"} guests
                   </p>
                 </div>
 
                 <div>
-                  <h3 className='font-semibold mb-2'>Room Amenities</h3>
+                  <h3 className='font-semibold mb-2 text-gray-800'>
+                    Room Amenities
+                  </h3>
                   <div className='grid grid-cols-2 gap-2'>
                     {booking.room?.amenities?.map((amenity) => (
                       <div key={amenity} className='flex items-center'>
                         <span className='text-green-500 mr-2'>✓</span>
-                        <span className='text-sm capitalize'>{amenity}</span>
+                        <span className='text-sm capitalize text-gray-800'>
+                          {amenity}
+                        </span>
                       </div>
-                    )) || <p className='text-gray-500'>No amenities listed</p>}
+                    )) || <p className='text-gray-800'>No amenities listed</p>}
                   </div>
                 </div>
               </div>
@@ -430,12 +436,14 @@ export default function BookingDetailsPage() {
 
             {/* Guest Details */}
             <div className='bg-white rounded-lg shadow-md p-6'>
-              <h2 className='text-xl font-bold mb-4'>Guest Details</h2>
+              <h2 className='text-xl font-bold mb-4 text-gray-900'>
+                Guest Details
+              </h2>
 
               <div className='space-y-4'>
                 {booking.guests?.map((guest, index) => (
                   <div key={index}>
-                    <h3 className='font-semibold mb-2'>
+                    <h3 className='font-semibold mb-2 text-gray-900'>
                       {guest.isPrimaryGuest
                         ? "Primary Guest"
                         : `Guest ${index + 1}`}
@@ -448,26 +456,28 @@ export default function BookingDetailsPage() {
                     <div className='bg-gray-50 rounded-lg p-4'>
                       <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
                         <div>
-                          <span className='text-sm text-gray-600'>Name</span>
-                          <div className='font-medium'>
+                          <span className='text-sm text-gray-800'>Name</span>
+                          <div className='font-medium text-gray-900'>
                             {guest.firstName} {guest.lastName}
                           </div>
                         </div>
                         {guest.age && (
                           <div>
-                            <span className='text-sm text-gray-600'>Age</span>
-                            <div className='font-medium'>{guest.age}</div>
+                            <span className='text-sm text-gray-800'>Age</span>
+                            <div className='font-medium text-gray-900'>
+                              {guest.age}
+                            </div>
                           </div>
                         )}
                         {guest.idProofType && (
                           <div>
-                            <span className='text-sm text-gray-600'>
+                            <span className='text-sm text-gray-800'>
                               ID Proof
                             </span>
-                            <div className='font-medium'>
+                            <div className='font-medium text-gray-900'>
                               {guest.idProofType}
                               {guest.idProofNumber && (
-                                <div className='text-sm text-gray-500'>
+                                <div className='text-sm text-gray-900'>
                                   {guest.idProofNumber}
                                 </div>
                               )}
@@ -476,10 +486,10 @@ export default function BookingDetailsPage() {
                         )}
                         {guest.specialRequests && (
                           <div className='md:col-span-3'>
-                            <span className='text-sm text-gray-600'>
+                            <span className='text-sm text-gray-800'>
                               Special Requests
                             </span>
-                            <div className='font-medium'>
+                            <div className='font-medium text-gray-900'>
                               {guest.specialRequests}
                             </div>
                           </div>
@@ -491,36 +501,36 @@ export default function BookingDetailsPage() {
 
                 {/* Customer Details */}
                 <div>
-                  <h3 className='font-semibold mb-2'>
+                  <h3 className='font-semibold mb-2 text-gray-900'>
                     Customer Contact Information
                   </h3>
                   <div className='bg-gray-50 rounded-lg p-4'>
                     <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
                       <div>
-                        <span className='text-sm text-gray-600'>Name</span>
-                        <div className='font-medium'>
+                        <span className='text-sm text-gray-800'>Name</span>
+                        <div className='font-medium text-gray-900'>
                           {booking.customer.firstName}{" "}
                           {booking.customer.lastName}
                         </div>
                       </div>
                       <div>
-                        <span className='text-sm text-gray-600'>Phone</span>
-                        <div className='font-medium'>
+                        <span className='text-sm text-gray-800'>Phone</span>
+                        <div className='font-medium text-gray-900'>
                           {booking.customer.phoneNumber}
                         </div>
                       </div>
                       <div>
-                        <span className='text-sm text-gray-600'>Email</span>
-                        <div className='font-medium'>
+                        <span className='text-sm text-gray-800'>Email</span>
+                        <div className='font-medium text-gray-900'>
                           {booking.customer.email}
                         </div>
                       </div>
                       {booking.customer.emergencyContact && (
                         <div>
-                          <span className='text-sm text-gray-600'>
+                          <span className='text-sm text-gray-800'>
                             Emergency Contact
                           </span>
-                          <div className='font-medium'>
+                          <div className='font-medium text-gray-900'>
                             {booking.customer.emergencyContact}
                           </div>
                         </div>
@@ -532,42 +542,16 @@ export default function BookingDetailsPage() {
                 {/* Special Requests */}
                 {booking.specialRequests && (
                   <div>
-                    <h3 className='font-semibold mb-2'>Special Requests</h3>
+                    <h3 className='font-semibold mb-2 text-gray-900'>
+                      Special Requests
+                    </h3>
                     <div className='bg-gray-50 rounded-lg p-4'>
-                      <div className='font-medium'>
+                      <div className='font-medium text-gray-900'>
                         {booking.specialRequests}
                       </div>
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* Policies */}
-            <div className='bg-white rounded-lg shadow-md p-6'>
-              <h2 className='text-xl font-bold mb-4'>Hotel Policies</h2>
-
-              <div className='space-y-4'>
-                <div>
-                  <h3 className='font-semibold mb-2'>Cancellation Policy</h3>
-                  <p className='text-sm text-gray-600'>
-                    Policy information not available
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className='font-semibold mb-2'>Check-in Policy</h3>
-                  <p className='text-sm text-gray-600'>
-                    Policy information not available
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className='font-semibold mb-2'>Child Policy</h3>
-                  <p className='text-sm text-gray-600'>
-                    Policy information not available
-                  </p>
-                </div>
               </div>
             </div>
           </div>
@@ -576,31 +560,43 @@ export default function BookingDetailsPage() {
           <div className='space-y-6'>
             {/* Payment Summary */}
             <div className='bg-white rounded-lg shadow-md p-6'>
-              <h2 className='text-xl font-bold mb-4'>Payment Summary</h2>
+              <h2 className='text-xl font-bold mb-4 text-gray-900'>
+                Payment Summary
+              </h2>
 
               <div className='space-y-3'>
                 <div className='flex justify-between'>
-                  <span>Room charges ({calculateNights()} nights)</span>
-                  <span>₹{(booking.totalAmount * 0.88).toLocaleString()}</span>
+                  <span className='text-gray-800'>
+                    Room charges ({calculateNights()} nights)
+                  </span>
+                  <span className='text-gray-900'>
+                    ₹{(booking.totalAmount * 0.88).toLocaleString()}
+                  </span>
                 </div>
 
                 <div className='flex justify-between'>
-                  <span>Taxes & fees</span>
-                  <span>₹{(booking.totalAmount * 0.12).toLocaleString()}</span>
+                  <span className='text-gray-800'>Taxes & fees</span>
+                  <span className='text-gray-900'>
+                    ₹{(booking.totalAmount * 0.12).toLocaleString()}
+                  </span>
                 </div>
 
                 <hr className='my-3' />
 
                 <div className='flex justify-between text-lg font-bold'>
-                  <span>Total Paid</span>
-                  <span>₹{booking.totalAmount.toLocaleString()}</span>
+                  <span className='text-gray-900'>Total Paid</span>
+                  <span className='text-gray-900'>
+                    ₹{booking.totalAmount.toLocaleString()}
+                  </span>
                 </div>
               </div>
 
               {booking.payment && (
                 <div className='mt-4 pt-4 border-t'>
-                  <h3 className='font-semibold mb-2'>Payment Details</h3>
-                  <div className='text-sm space-y-1'>
+                  <h3 className='font-semibold mb-2 text-gray-800'>
+                    Payment Details
+                  </h3>
+                  <div className='text-sm space-y-1 text-gray-900'>
                     <div>Method: {booking.payment.paymentMethod}</div>
                     <div>Status: {booking.payment.paymentStatus}</div>
                     <div>
@@ -613,18 +609,20 @@ export default function BookingDetailsPage() {
 
             {/* Hotel Contact */}
             <div className='bg-white rounded-lg shadow-md p-6'>
-              <h2 className='text-xl font-bold mb-4'>Hotel Contact</h2>
+              <h2 className='text-xl font-bold mb-4 text-gray-900'>
+                Hotel Contact
+              </h2>
 
               <div className='space-y-3'>
                 <div>
-                  <h3 className='font-semibold'>
+                  <h3 className='font-semibold text-gray-800'>
                     {booking.vendor?.businessName || "Hotel Contact"}
                   </h3>
                 </div>
 
                 <div>
-                  <span className='text-sm text-gray-600'>Phone</span>
-                  <div>
+                  <span className='text-sm text-gray-800'>Phone</span>
+                  <div className='text-gray-900'>
                     {booking.vendor?.contactNumbers?.join(", ") ||
                       booking.hotel?.contactNumbers?.join(", ") ||
                       "Phone not available"}
@@ -632,37 +630,42 @@ export default function BookingDetailsPage() {
                 </div>
 
                 <div>
-                  <span className='text-sm text-gray-600'>Email</span>
-                  <div>Email not available</div>
-                </div>
-
-                <div>
-                  <span className='text-sm text-gray-600'>Address</span>
-                  <div>{booking.hotel?.address || "Address not available"}</div>
+                  <span className='text-sm text-gray-800'>Address</span>
+                  <div className='text-gray-900'>
+                    {booking.hotel?.address || "Address not available"}
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Booking Timeline */}
             <div className='bg-white rounded-lg shadow-md p-6'>
-              <h2 className='text-xl font-bold mb-4'>Booking Timeline</h2>
+              <h2 className='text-xl font-bold mb-4 text-gray-900'>
+                Booking Timeline
+              </h2>
 
               <div className='space-y-3 text-sm'>
                 <div className='flex justify-between'>
-                  <span>Booking created</span>
-                  <span>{formatDateTime(booking.createdAt)}</span>
+                  <span className='text-gray-800'>Booking created</span>
+                  <span className='text-gray-900'>
+                    {formatDateTime(booking.createdAt)}
+                  </span>
                 </div>
 
                 {booking.payment && (
                   <div className='flex justify-between'>
-                    <span>Payment completed</span>
-                    <span>{formatDateTime(booking.payment.processedAt)}</span>
+                    <span className='text-gray-800'>Payment completed</span>
+                    <span className='text-gray-900'>
+                      {formatDateTime(booking.payment.processedAt)}
+                    </span>
                   </div>
                 )}
 
                 <div className='flex justify-between'>
-                  <span>Last updated</span>
-                  <span>{formatDateTime(booking.createdAt)}</span>
+                  <span className='text-gray-800'>Last updated</span>
+                  <span className='text-gray-900'>
+                    {formatDateTime(booking.createdAt)}
+                  </span>
                 </div>
               </div>
             </div>

@@ -1,17 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AuthService } from "../lib/auth";
 
 export default function Home() {
   const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchData, setSearchData] = useState({
     location: "",
     checkIn: "",
     checkOut: "",
     guests: 2,
   });
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = () => {
+      const authenticated = AuthService.isAuthenticated();
+      setIsAuthenticated(authenticated);
+      setLoading(false);
+    };
+
+    checkAuth();
+
+    // Listen for storage events to update auth status across tabs
+    const handleStorageChange = () => {
+      checkAuth();
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  const handleSignOut = () => {
+    AuthService.clearAuthData();
+    setIsAuthenticated(false);
+    window.location.reload();
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,20 +74,34 @@ export default function Home() {
             <Link href='/' className='text-2xl font-semibold text-gray-900'>
               Sojourn
             </Link>
-            <nav className='hidden md:flex space-x-8'>
-              <Link
-                href='/hotels'
-                className='text-gray-600 hover:text-gray-900 font-medium transition-colors'
-              >
-                Hotels
-              </Link>
-              <Link
-                href='/dashboard'
-                className='text-gray-600 hover:text-gray-900 font-medium transition-colors'
-              >
-                Dashboard
-              </Link>
-            </nav>
+            <div className='flex items-center space-x-8'>
+              {/* Authentication Navigation */}
+              {loading ? (
+                <div className='w-24 h-8 bg-gray-200 animate-pulse rounded'></div>
+              ) : isAuthenticated ? (
+                <div className='flex items-center space-x-4'>
+                  <Link
+                    href='/bookings'
+                    className='text-gray-600 hover:text-gray-900 font-medium transition-colors'
+                  >
+                    Your Bookings
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className='text-gray-600 hover:text-red-600 font-medium transition-colors'
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  href='/auth'
+                  className='text-gray-600 hover:text-gray-900 font-medium transition-colors'
+                >
+                  Sign In
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </header>

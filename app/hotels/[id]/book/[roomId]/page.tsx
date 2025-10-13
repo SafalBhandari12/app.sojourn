@@ -510,20 +510,25 @@ export default function BookingPage() {
             <Link href='/' className='text-2xl font-semibold text-gray-900'>
               Sojourn
             </Link>
-            <nav className='hidden md:flex space-x-8'>
+
+            {/* Simple navigation for authenticated users */}
+            <div className='flex items-center space-x-4'>
               <Link
-                href='/hotels'
-                className='text-gray-600 hover:text-gray-900 font-medium'
+                href='/bookings'
+                className='text-gray-600 hover:text-gray-900 font-medium transition-colors'
               >
-                Hotels
+                Your Bookings
               </Link>
-              <Link
-                href='/dashboard'
-                className='text-gray-600 hover:text-gray-900'
+              <button
+                onClick={() => {
+                  AuthService.clearAuthData();
+                  window.location.href = "/";
+                }}
+                className='text-gray-600 hover:text-red-600 font-medium transition-colors'
               >
-                Dashboard
-              </Link>
-            </nav>
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </header>

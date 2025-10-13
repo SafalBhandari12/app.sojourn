@@ -85,6 +85,8 @@ export default function HotelDetailsPage() {
   const [availableRooms, setAvailableRooms] = useState<RoomAvailability[]>([]);
   const [loading, setLoading] = useState(true);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
@@ -97,6 +99,31 @@ export default function HotelDetailsPage() {
   useEffect(() => {
     fetchHotelDetails();
   }, [hotelId]);
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = () => {
+      const authenticated = AuthService.isAuthenticated();
+      setIsAuthenticated(authenticated);
+      setAuthLoading(false);
+    };
+
+    checkAuth();
+
+    // Listen for storage events to update auth status across tabs
+    const handleStorageChange = () => {
+      checkAuth();
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  const handleSignOut = () => {
+    AuthService.clearAuthData();
+    setIsAuthenticated(false);
+    window.location.reload();
+  };
 
   // Read URL parameters and set form values
   useEffect(() => {
@@ -283,34 +310,26 @@ export default function HotelDetailsPage() {
             >
               Sojourn
             </Link>
-            <nav className='hidden md:flex space-x-8'>
-              <Link
-                href='/hotels'
-                className='text-gray-900 font-medium hover:text-gray-600 transition-colors'
-              >
-                Hotels
-              </Link>
-              <Link
-                href='/about'
-                className='text-gray-700 hover:text-gray-900 transition-colors'
-              >
-                About
-              </Link>
-              <Link
-                href='/contact'
-                className='text-gray-700 hover:text-gray-900 transition-colors'
-              >
-                Contact
-              </Link>
-            </nav>
+
+            {/* Authentication Navigation */}
             <div className='flex items-center space-x-4'>
-              {AuthService.isAuthenticated() ? (
-                <Link
-                  href='/dashboard'
-                  className='text-gray-700 hover:text-gray-900 transition-colors'
-                >
-                  Dashboard
-                </Link>
+              {authLoading ? (
+                <div className='w-24 h-8 bg-gray-200 animate-pulse rounded'></div>
+              ) : isAuthenticated ? (
+                <div className='flex items-center space-x-4'>
+                  <Link
+                    href='/bookings'
+                    className='text-gray-700 hover:text-gray-900 font-medium transition-colors'
+                  >
+                    Your Bookings
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className='text-gray-700 hover:text-red-600 font-medium transition-colors'
+                  >
+                    Sign Out
+                  </button>
+                </div>
               ) : (
                 <Link
                   href='/auth'
