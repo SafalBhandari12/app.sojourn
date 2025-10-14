@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthService } from "../../../lib/auth";
@@ -66,42 +66,32 @@ export default function BookingDetailsPage() {
 
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [loading, setLoading] = useState(true);
-  const [cancelling, setCancelling] = useState(false);
 
   // Helper function to handle authentication errors
-  const handleAuthError = (error: unknown) => {
-    if (
-      error instanceof Error &&
-      (error.message.includes("No access token") ||
-        error.message.includes("Authentication failed") ||
-        error.message.includes("Unable to refresh token"))
-    ) {
-      // Clear any loading states and redirect
-      setLoading(false);
-      setCancelling(false);
+  const handleAuthError = useCallback(
+    (error: unknown) => {
+      if (
+        error instanceof Error &&
+        (error.message.includes("No access token") ||
+          error.message.includes("Authentication failed") ||
+          error.message.includes("Unable to refresh token"))
+      ) {
+        // Clear any loading states and redirect
+        setLoading(false);
 
-      // Store current URL as return URL
-      const returnUrl = window.location.pathname + window.location.search;
-      AuthService.setReturnUrl(returnUrl);
+        // Store current URL as return URL
+        const returnUrl = window.location.pathname + window.location.search;
+        AuthService.setReturnUrl(returnUrl);
 
-      router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
-      return true;
-    }
-    return false;
-  };
+        router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
+        return true;
+      }
+      return false;
+    },
+    [router]
+  );
 
-  useEffect(() => {
-    // Check if user is authenticated before fetching data
-    if (!AuthService.isAuthenticated()) {
-      const returnUrl = window.location.pathname + window.location.search;
-      AuthService.setReturnUrl(returnUrl);
-      router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
-      return;
-    }
-
-    fetchBookingDetails();
-  }, [bookingId, router]);
-  const fetchBookingDetails = async () => {
+  const fetchBookingDetails = useCallback(async () => {
     try {
       const response = await AuthService.authenticatedFetch(
         `${BACKEND_URL}/api/hotels/bookings/${bookingId}`
@@ -121,53 +111,21 @@ export default function BookingDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [bookingId, handleAuthError]);
 
-  const handleCancelBooking = async () => {
-    if (
-      !confirm(
-        "Are you sure you want to cancel this booking? This action cannot be undone."
-      )
-    ) {
+  useEffect(() => {
+    // Check if user is authenticated before fetching data
+    if (!AuthService.isAuthenticated()) {
+      const returnUrl = window.location.pathname + window.location.search;
+      AuthService.setReturnUrl(returnUrl);
+      router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
 
-    setCancelling(true);
-    try {
-      const response = await AuthService.authenticatedFetch(
-        `${BACKEND_URL}/api/hotels/bookings/${bookingId}/cancel`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            reason: "User requested cancellation",
-            requestRefund: true,
-          }),
-        }
-      );
+    fetchBookingDetails();
+  }, [fetchBookingDetails, router]);
 
-      const data = await response.json();
-
-      if (data.success) {
-        alert(
-          "Booking cancelled successfully. Refund will be processed within 3-5 business days."
-        );
-        fetchBookingDetails(); // Refresh the details
-      } else {
-        alert(data.message || "Failed to cancel booking");
-      }
-    } catch (error) {
-      console.error("Error cancelling booking:", error);
-
-      // Handle authentication errors
-      if (handleAuthError(error)) {
-        return;
-      }
-
-      alert("Failed to cancel booking. Please try again.");
-    } finally {
-      setCancelling(false);
-    }
-  };
+  // handleCancelBooking removed as it's not used (no cancel button in UI)
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -211,10 +169,7 @@ export default function BookingDetailsPage() {
     );
   };
 
-  const isUpcoming = () => {
-    if (!booking) return false;
-    return new Date(booking.checkInDate) > new Date();
-  };
+  // isUpcoming removed as it's not used
 
   if (loading) {
     return (

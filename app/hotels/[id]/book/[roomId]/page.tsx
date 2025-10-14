@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import Script from "next/script";
 import { AuthService } from "../../../../../lib/auth";
-import PaymentUtils from "../../../../../lib/payment-utils";
+import PaymentUtils, {
+  PaymentBackendData,
+  RazorpayResponse,
+} from "../../../../../lib/payment-utils";
 
 interface BookingData {
   hotelId: string;
@@ -114,48 +116,7 @@ export default function BookingPage() {
     specialRequests: "",
   });
 
-  useEffect(() => {
-    // Check if Razorpay is already loaded
-    setRazorpayLoaded(PaymentUtils.isRazorpayLoaded());
-
-    // Debug: Log search params
-    console.log("Debug - Search Params:", {
-      checkIn,
-      checkOut,
-      guests,
-      hotelId,
-      roomId,
-    });
-
-    // Check authentication
-    if (!AuthService.isAuthenticated()) {
-      const returnUrl = `/hotels/${hotelId}/book/${roomId}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`;
-
-      // Store return URL in localStorage as backup
-      AuthService.setReturnUrl(returnUrl);
-
-      // Redirect to auth with return URL
-      router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
-      return;
-    }
-
-    fetchBookingDetails();
-    setupAdditionalGuests();
-  }, [hotelId, roomId]);
-
-  useEffect(() => {
-    calculatePricing();
-  }, [localCheckIn, localCheckOut, room]);
-
-  useEffect(() => {
-    setFormData((prev) => ({
-      ...prev,
-      checkInDate: localCheckIn || checkIn,
-      checkOutDate: localCheckOut || checkOut,
-    }));
-  }, [localCheckIn, localCheckOut, checkIn, checkOut]);
-
-  const fetchBookingDetails = async () => {
+  const fetchBookingDetails = useCallback(async () => {
     try {
       // Fetch hotel details
       const hotelResponse = await fetch(`${BACKEND_URL}/api/hotels/${hotelId}`);
@@ -177,9 +138,9 @@ export default function BookingPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [hotelId, roomId]);
 
-  const setupAdditionalGuests = () => {
+  const setupAdditionalGuests = useCallback(() => {
     const guestList: Array<{
       firstName: string;
       lastName: string;
@@ -218,9 +179,9 @@ export default function BookingPage() {
       ...prev,
       guestDetails: guestList,
     }));
-  };
+  }, [guests]);
 
-  const calculatePricing = () => {
+  const calculatePricing = useCallback(() => {
     const currentCheckIn = localCheckIn || checkIn;
     const currentCheckOut = localCheckOut || checkOut;
 
@@ -243,7 +204,59 @@ export default function BookingPage() {
       taxes,
       finalAmount,
     });
-  };
+  }, [localCheckIn, localCheckOut, checkIn, checkOut, room]);
+
+  useEffect(() => {
+    calculatePricing();
+  }, [localCheckIn, localCheckOut, room, calculatePricing]);
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      checkInDate: localCheckIn || checkIn,
+      checkOutDate: localCheckOut || checkOut,
+    }));
+  }, [localCheckIn, localCheckOut, checkIn, checkOut]);
+
+  // Moved auth/check & initial fetch effect. Includes stable callbacks to satisfy
+  // react-hooks/exhaustive-deps.
+  useEffect(() => {
+    // Check if Razorpay is already loaded
+    setRazorpayLoaded(PaymentUtils.isRazorpayLoaded());
+
+    // Debug: Log search params
+    console.log("Debug - Search Params:", {
+      checkIn,
+      checkOut,
+      guests,
+      hotelId,
+      roomId,
+    });
+
+    // Check authentication
+    if (!AuthService.isAuthenticated()) {
+      const returnUrl = `/hotels/${hotelId}/book/${roomId}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`;
+
+      // Store return URL in localStorage as backup
+      AuthService.setReturnUrl(returnUrl);
+
+      // Redirect to auth with return URL
+      router.push(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
+      return;
+    }
+
+    fetchBookingDetails();
+    setupAdditionalGuests();
+  }, [
+    hotelId,
+    roomId,
+    checkIn,
+    checkOut,
+    guests,
+    router,
+    fetchBookingDetails,
+    setupAdditionalGuests,
+  ]);
 
   const handleInputChange = (field: string, value: string) => {
     if (field.startsWith("userDetails.")) {
@@ -386,17 +399,38 @@ export default function BookingPage() {
     }
   };
 
-  const initiatePayment = async (paymentData: any, bookingId: string) => {
+  const initiatePayment = async (paymentData: unknown, bookingId: string) => {
+    // Narrow and validate the runtime shape before using it
+    const isPaymentBackendData = (p: unknown): p is PaymentBackendData => {
+      if (!p || typeof p !== "object") return false;
+      const obj = p as Record<string, unknown>;
+      return (
+        typeof obj.key === "string" &&
+        typeof obj.amount === "number" &&
+        typeof obj.currency === "string" &&
+        (typeof obj.order_id === "string" || typeof obj.orderId === "string")
+      );
+    };
+
+    if (!isPaymentBackendData(paymentData)) {
+      console.error("Invalid payment data:", paymentData);
+      alert("Payment initialization failed due to invalid payment data.");
+      return;
+    }
+
     try {
+      // Handler must match the RazorpayResponse signature and should not return a Promise
+      const handler = (response: RazorpayResponse) => {
+        // Call async verifier without awaiting here (Razorpay expects a sync handler)
+        void verifyPayment(response, bookingId);
+      };
+
       const options = PaymentUtils.formatPaymentOptions(
         paymentData,
         bookingId,
-        async (response: any) => {
-          await verifyPayment(response, bookingId);
-        },
+        handler,
         () => {
           console.log("Payment modal dismissed");
-          // Booking remains in PENDING status - customer can retry payment
         }
       );
 
@@ -411,7 +445,14 @@ export default function BookingPage() {
     }
   };
 
-  const verifyPayment = async (paymentResponse: any, bookingId: string) => {
+  const verifyPayment = async (
+    paymentResponse: {
+      razorpay_payment_id: string;
+      razorpay_order_id: string;
+      razorpay_signature: string;
+    },
+    bookingId: string
+  ) => {
     try {
       const response = await AuthService.authenticatedFetch(
         `${BACKEND_URL}/api/hotels/bookings/${bookingId}/payment/verify`,
@@ -606,12 +647,14 @@ export default function BookingPage() {
                 </div>
                 <div className='mt-3 text-xs text-blue-600'>
                   <p>
-                    • Your room will be reserved only when payment is initiated
+                    &bull; Your room will be reserved only when payment is
+                    initiated
                   </p>
                   <p>
-                    • Secure payment via Razorpay with all major payment methods
+                    &bull; Secure payment via Razorpay with all major payment
+                    methods
                   </p>
-                  <p>• Instant confirmation upon successful payment</p>
+                  <p>&bull; Instant confirmation upon successful payment</p>
                 </div>
               </div>
 
@@ -1044,8 +1087,8 @@ export default function BookingPage() {
 
               <div className='mt-4 text-xs text-gray-500'>
                 <p>
-                  By clicking "Create Booking & Pay Now", you agree to our terms
-                  and conditions.
+                  By clicking &quot;Create Booking &amp; Pay Now&quot;, you
+                  agree to our terms and conditions.
                 </p>
                 <p className='mt-2'>✅ Secure payment powered by Razorpay</p>
                 <p className='mt-1'>

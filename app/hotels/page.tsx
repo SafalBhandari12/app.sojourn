@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
 import { AuthService } from "../../lib/auth";
 
 interface Hotel {
@@ -53,17 +52,18 @@ const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "https://sojournbackend.onrender.com";
 
 export default function HotelsPage() {
-  const searchParams = useSearchParams();
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  // Initialize filters without reading next/navigation's useSearchParams during render.
+  // We'll hydrate initial values from window.location.search on client mount to avoid requiring a Suspense boundary.
   const [filters, setFilters] = useState<SearchFilters>({
-    location: searchParams.get("location") || "",
-    checkIn: searchParams.get("checkIn") || "",
-    checkOut: searchParams.get("checkOut") || "",
-    guests: parseInt(searchParams.get("guests") || "2"),
-    category: searchParams.get("category") || "",
+    location: "",
+    checkIn: "",
+    checkOut: "",
+    guests: 2,
+    category: "",
     minPrice: 0,
     maxPrice: 50000,
     amenities: [],
@@ -113,59 +113,62 @@ export default function HotelsPage() {
     window.location.reload();
   };
 
+  const searchHotels = useCallback(
+    async (page = 1) => {
+      setLoading(true);
+      try {
+        const queryParams = new URLSearchParams({
+          page: page.toString(),
+          limit: pagination.limit.toString(),
+          ...(filters.location && { location: filters.location }),
+          ...(filters.checkIn && { checkIn: filters.checkIn }),
+          ...(filters.checkOut && { checkOut: filters.checkOut }),
+          ...(filters.guests && { guests: filters.guests.toString() }),
+          ...(filters.category && { category: filters.category }),
+          ...(filters.minPrice && { minPrice: filters.minPrice.toString() }),
+          ...(filters.maxPrice && { maxPrice: filters.maxPrice.toString() }),
+          ...(filters.amenities.length > 0 && {
+            amenities: filters.amenities.join(","),
+          }),
+        });
+
+        const apiUrl = `${BACKEND_URL}/api/hotels/search?${queryParams}`;
+        console.log("API URL:", apiUrl);
+        console.log("Search params:", Object.fromEntries(queryParams));
+
+        const response = await fetch(apiUrl);
+        console.log("Response status:", response.status);
+
+        const data = await response.json();
+        console.log("API Response:", data);
+
+        if (data.success) {
+          setHotels(data.data.hotels || []);
+          setPagination(
+            data.data.pagination || {
+              page: 1,
+              limit: 10,
+              total: 0,
+              totalPages: 0,
+            }
+          );
+        } else {
+          console.error("API Error:", data.message);
+          setHotels([]);
+        }
+      } catch (error) {
+        console.error("Error searching hotels:", error);
+        setHotels([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [filters, pagination.limit]
+  );
+
   useEffect(() => {
     searchHotels();
-  }, []);
-
-  const searchHotels = async (page = 1) => {
-    setLoading(true);
-    try {
-      const queryParams = new URLSearchParams({
-        page: page.toString(),
-        limit: pagination.limit.toString(),
-        ...(filters.location && { location: filters.location }),
-        ...(filters.checkIn && { checkIn: filters.checkIn }),
-        ...(filters.checkOut && { checkOut: filters.checkOut }),
-        ...(filters.guests && { guests: filters.guests.toString() }),
-        ...(filters.category && { category: filters.category }),
-        ...(filters.minPrice && { minPrice: filters.minPrice.toString() }),
-        ...(filters.maxPrice && { maxPrice: filters.maxPrice.toString() }),
-        ...(filters.amenities.length > 0 && {
-          amenities: filters.amenities.join(","),
-        }),
-      });
-
-      const apiUrl = `${BACKEND_URL}/api/hotels/search?${queryParams}`;
-      console.log("API URL:", apiUrl);
-      console.log("Search params:", Object.fromEntries(queryParams));
-
-      const response = await fetch(apiUrl);
-      console.log("Response status:", response.status);
-
-      const data = await response.json();
-      console.log("API Response:", data);
-
-      if (data.success) {
-        setHotels(data.data.hotels || []);
-        setPagination(
-          data.data.pagination || {
-            page: 1,
-            limit: 10,
-            total: 0,
-            totalPages: 0,
-          }
-        );
-      } else {
-        console.error("API Error:", data.message);
-        setHotels([]);
-      }
-    } catch (error) {
-      console.error("Error searching hotels:", error);
-      setHotels([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [searchHotels]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,6 +200,29 @@ export default function HotelsPage() {
     }
     return stars.join("");
   };
+
+  // Hydrate initial filters from URL query params on client mount
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const location = params.get("location") || "";
+      const checkIn = params.get("checkIn") || "";
+      const checkOut = params.get("checkOut") || "";
+      const guests = parseInt(params.get("guests") || "2");
+      const category = params.get("category") || "";
+
+      setFilters((prev) => ({
+        ...prev,
+        location,
+        checkIn,
+        checkOut,
+        guests: Number.isNaN(guests) ? prev.guests : guests,
+        category,
+      }));
+    } catch {
+      // ignore if window is not available or URL parsing fails
+    }
+  }, []);
 
   return (
     <div className='min-h-screen bg-gray-50'>
@@ -757,8 +783,8 @@ export default function HotelsPage() {
                     No Hotels Found
                   </h3>
                   <p className='text-gray-600 mb-4'>
-                    We couldn't find any hotels matching your search criteria.
-                    Try adjusting your filters or search terms.
+                    We couldn&apos;t find any hotels matching your search
+                    criteria. Try adjusting your filters or search terms.
                   </p>
                   <button
                     onClick={() => {

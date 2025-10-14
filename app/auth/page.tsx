@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { AuthService } from "../../lib/auth";
 
 interface SendOTPResponse {
@@ -33,8 +33,20 @@ const BACKEND_URL =
 
 export default function AuthPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const returnUrlFromParams = searchParams.get("returnUrl");
+  const [returnUrlFromParams, setReturnUrlFromParams] = useState<string | null>(
+    null
+  );
+
+  // Hydrate returnUrl from the URL on client mount to avoid useSearchParams during render
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      setReturnUrlFromParams(params.get("returnUrl"));
+    } catch (err) {
+      // ignore
+    }
+  }, []);
+
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
@@ -44,7 +56,7 @@ export default function AuthPage() {
   const [timeout, setTimeout] = useState<number>(0);
 
   // Determine the final return URL (from params, localStorage, or default)
-  const getReturnUrl = () => {
+  const getReturnUrl = useCallback(() => {
     if (returnUrlFromParams) {
       // Clear any stored URL since we're using the param one
       AuthService.clearReturnUrl();
@@ -52,7 +64,7 @@ export default function AuthPage() {
     }
     const storedUrl = AuthService.getAndClearReturnUrl();
     return storedUrl || "/";
-  };
+  }, [returnUrlFromParams]);
 
   // Check if user is already authenticated
   useEffect(() => {
@@ -60,7 +72,7 @@ export default function AuthPage() {
       const redirectUrl = getReturnUrl();
       router.push(redirectUrl);
     }
-  }, [router]);
+  }, [router, getReturnUrl]);
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +99,7 @@ export default function AuthPage() {
       } else {
         setError(data.message || "Failed to send OTP");
       }
-    } catch (err) {
+    } catch {
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -130,7 +142,7 @@ export default function AuthPage() {
       } else {
         setError(data.message || "Invalid OTP");
       }
-    } catch (err) {
+    } catch {
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);

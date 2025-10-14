@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
+
 import { AuthService } from "../../lib/auth";
 
 interface Booking {
@@ -48,6 +48,38 @@ interface BookingSummary {
   totalSpent: number;
 }
 
+// Types for older/legacy API shapes (avoid using `any`)
+type LegacyRoom = {
+  type?: string;
+  roomType?: string;
+  number?: string;
+  roomNumber?: string;
+};
+
+type LegacyBooking = {
+  bookingId?: string;
+  booking?: {
+    id?: string;
+    bookingId?: string;
+    payment?: {
+      paymentStatus?: string;
+      paymentMethod?: string;
+      razorpayPaymentId?: string;
+      processedAt?: string;
+      totalAmount?: number;
+    };
+  };
+  bookingRef?: string;
+  hotel?: { name?: string; address?: string };
+  vendor?: { businessName?: string };
+  room?: LegacyRoom;
+  payment?: { paymentStatus?: string; totalAmount?: number };
+  hotelProfile?: {
+    hotelName?: string;
+    vendor?: { businessName?: string; businessAddress?: string };
+  };
+};
+
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "https://sojournbackend.onrender.com";
 
@@ -63,11 +95,7 @@ export default function BookingsPage() {
     totalPages: 0,
   });
 
-  useEffect(() => {
-    fetchBookings();
-  }, [selectedStatus, pagination.page]);
-
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     setLoading(true);
     try {
       const queryParams = new URLSearchParams({
@@ -91,7 +119,11 @@ export default function BookingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedStatus, pagination.page, pagination.limit]);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
 
   const handleCancelBooking = async (bookingId: string) => {
     if (!confirm("Are you sure you want to cancel this booking?")) {
@@ -293,44 +325,50 @@ export default function BookingsPage() {
           <div className='space-y-6'>
             {bookings.map((booking, idx) => {
               // normalize fields for backward/forward compatibility
-              const anyBooking = booking as any;
+              const legacy = booking as unknown as LegacyBooking;
+
               // determine stable unique key and link id for this booking
               const linkId =
                 booking.id ??
-                anyBooking.bookingId ??
-                null ??
-                (anyBooking.booking &&
-                  (anyBooking.booking.id ?? anyBooking.booking.bookingId)) ??
-                anyBooking.bookingRef ??
+                legacy.bookingId ??
+                (legacy.booking &&
+                  (legacy.booking.id ?? legacy.booking.bookingId)) ??
+                legacy.bookingRef ??
                 idx;
               const listKey = linkId;
+
               const hotelName =
-                anyBooking.hotel?.name ||
+                legacy.hotel?.name ||
                 booking.hotelProfile?.hotelName ||
-                anyBooking.vendor?.businessName ||
+                legacy.vendor?.businessName ||
                 "Unknown Hotel";
+
               const hotelAddress =
-                anyBooking.hotel?.address ||
+                legacy.hotel?.address ||
                 booking.hotelProfile?.vendor?.businessAddress ||
                 "";
-              const vendorBusinessName =
-                anyBooking.vendor?.businessName ||
-                booking.hotelProfile?.vendor?.businessName ||
-                "";
+
               const payment =
-                booking.booking?.payment || anyBooking.payment || null;
+                booking.booking?.payment || legacy.payment || null;
+
               const roomType =
                 booking.room?.roomType ||
-                (anyBooking.room as any)?.type ||
-                (anyBooking.room as any)?.roomType ||
+                legacy.room?.type ||
+                legacy.room?.roomType ||
                 "";
+
               const roomNumber =
                 booking.room?.roomNumber ||
-                (anyBooking.room as any)?.number ||
-                (anyBooking.room as any)?.roomNumber ||
+                legacy.room?.number ||
+                legacy.room?.roomNumber ||
                 "";
+
               const totalAmount =
-                booking.totalAmount ?? payment?.totalAmount ?? 0;
+                booking.totalAmount ??
+                (payment && "totalAmount" in payment
+                  ? payment.totalAmount
+                  : 0) ??
+                0;
 
               return (
                 <div

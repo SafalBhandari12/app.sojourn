@@ -1,6 +1,54 @@
 // Payment utility for Razorpay integration
 // Handles script loading and payment initialization
 
+export interface RazorpayResponse {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+}
+
+export interface PaymentBackendData {
+  key: string;
+  amount: number;
+  currency: string;
+  order_id: string;
+  orderId?: string;
+  name?: string;
+  description?: string;
+  image?: string;
+  prefill?: {
+    name?: string;
+    email?: string;
+    contact?: string;
+  };
+  theme?: {
+    color?: string;
+  };
+  retry?: {
+    enabled?: boolean;
+    max_count?: number;
+  };
+  timeout?: number;
+  remember_customer?: boolean;
+  readonly?: {
+    email?: boolean;
+    contact?: boolean;
+    name?: boolean;
+  };
+  hidden?: {
+    email?: boolean;
+    contact?: boolean;
+    name?: boolean;
+  };
+  notes?: Record<string, string>;
+}
+
+export interface ApiResponse {
+  success: boolean;
+  message?: string;
+  data?: unknown;
+}
+
 export interface RazorpayOptions {
   key: string;
   amount: number;
@@ -34,7 +82,7 @@ export interface RazorpayOptions {
     name?: boolean;
   };
   notes?: Record<string, string>;
-  handler: (response: any) => void;
+  handler: (response: RazorpayResponse) => void;
   modal?: {
     ondismiss?: () => void;
   };
@@ -77,8 +125,11 @@ export class PaymentUtils {
         throw new Error("Razorpay failed to load");
       }
 
-      // Create and open Razorpay instance
-      const rzp = new window.Razorpay(options);
+      // Create and open Razorpay instance (narrowed)
+      const RazorpayConstructor = window.Razorpay;
+      if (!RazorpayConstructor)
+        throw new Error("Razorpay constructor not available");
+      const rzp = new RazorpayConstructor(options);
       rzp.open();
 
       return true;
@@ -90,9 +141,9 @@ export class PaymentUtils {
 
   // Format payment options from backend response
   static formatPaymentOptions(
-    paymentData: any,
+    paymentData: PaymentBackendData,
     bookingId: string,
-    onSuccess: (response: any) => void,
+    onSuccess: (response: RazorpayResponse) => void,
     onDismiss?: () => void
   ): RazorpayOptions {
     return {
@@ -102,7 +153,7 @@ export class PaymentUtils {
       name: paymentData.name || "Sojourn",
       description: paymentData.description || "Hotel Booking",
       image: paymentData.image,
-      order_id: paymentData.orderId,
+      order_id: paymentData.orderId || paymentData.order_id,
       prefill: paymentData.prefill,
       theme: paymentData.theme,
       retry: paymentData.retry,
@@ -123,25 +174,42 @@ export class PaymentUtils {
   }
 
   // Safely access nested object properties
-  static safeGet(obj: any, path: string, defaultValue: any = null): any {
-    return path.split(".").reduce((current, key) => {
-      return current && current[key] !== undefined
-        ? current[key]
-        : defaultValue;
-    }, obj);
+  static safeGet<T = unknown>(
+    obj: unknown,
+    path: string,
+    defaultValue: T | null = null
+  ): T | null {
+    let current: unknown = obj;
+    const parts = path.split(".");
+
+    for (const key of parts) {
+      if (
+        current !== null &&
+        typeof current === "object" &&
+        Object.prototype.hasOwnProperty.call(current, key)
+      ) {
+        current = (current as Record<string, unknown>)[key];
+      } else {
+        return defaultValue;
+      }
+    }
+
+    return current as T;
   }
 
   // Validate API response structure
   static validateApiResponse(
-    response: any,
+    response: unknown,
     requiredFields: string[] = []
   ): boolean {
     if (!response || typeof response !== "object") {
       return false;
     }
 
+    const resp = response as Record<string, unknown>;
+
     // Check if success field exists and is true
-    if (!response.success) {
+    if (!resp["success"]) {
       return false;
     }
 
@@ -157,10 +225,11 @@ export class PaymentUtils {
   }
 
   // Log API response safely
-  static logApiResponse(response: any, context: string): void {
+  static logApiResponse(response: unknown, context: string): void {
     try {
       console.log(`${context} - Response:`, JSON.stringify(response, null, 2));
-    } catch (error) {
+    } catch {
+      // optional catch binding used to avoid unused variable lint
       console.log(`${context} - Response (non-serializable):`, response);
     }
   }
@@ -169,7 +238,9 @@ export class PaymentUtils {
 // Global Razorpay type declaration
 declare global {
   interface Window {
-    Razorpay: any;
+    Razorpay?: {
+      new (options: RazorpayOptions): { open: () => void };
+    };
   }
 }
 

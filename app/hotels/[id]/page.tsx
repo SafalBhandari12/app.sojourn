@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -91,14 +91,7 @@ export default function HotelDetailsPage() {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState(2);
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const [selectedRoom, setSelectedRoom] = useState<RoomAvailability | null>(
-    null
-  );
-
-  useEffect(() => {
-    fetchHotelDetails();
-  }, [hotelId]);
+  // Removed unused showBookingModal and selectedRoom states
 
   // Check authentication status
   useEffect(() => {
@@ -136,13 +129,7 @@ export default function HotelDetailsPage() {
     if (urlGuests) setGuests(parseInt(urlGuests));
   }, [searchParams]);
 
-  useEffect(() => {
-    if (checkIn && checkOut && guests) {
-      checkAvailability();
-    }
-  }, [checkIn, checkOut, guests]);
-
-  const fetchHotelDetails = async () => {
+  const fetchHotelDetails = useCallback(async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/hotels/${hotelId}`);
       const data = await response.json();
@@ -159,9 +146,9 @@ export default function HotelDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [hotelId]);
 
-  const checkAvailability = async () => {
+  const checkAvailability = useCallback(async () => {
     if (!checkIn || !checkOut || !guests) return;
 
     setAvailabilityLoading(true);
@@ -179,7 +166,17 @@ export default function HotelDetailsPage() {
     } finally {
       setAvailabilityLoading(false);
     }
-  };
+  }, [checkIn, checkOut, guests, hotelId]);
+
+  useEffect(() => {
+    fetchHotelDetails();
+  }, [fetchHotelDetails]);
+
+  useEffect(() => {
+    if (checkIn && checkOut && guests) {
+      checkAvailability();
+    }
+  }, [checkIn, checkOut, guests, checkAvailability]);
 
   const handleBookRoom = (room: RoomAvailability) => {
     // Check if user is authenticated
@@ -200,22 +197,7 @@ export default function HotelDetailsPage() {
     );
   };
 
-  const getRatingStars = (rating: number) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-
-    for (let i = 0; i < fullStars; i++) {
-      stars.push("★");
-    }
-    if (hasHalfStar) {
-      stars.push("☆");
-    }
-    while (stars.length < 5) {
-      stars.push("☆");
-    }
-    return stars.join("");
-  };
+  // Removed unused getRatingStars function
 
   const calculateNights = () => {
     if (!checkIn || !checkOut) return 0;
@@ -225,30 +207,34 @@ export default function HotelDetailsPage() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  const calculateSeasonalPrice = (room: any, checkInDate?: string) => {
-    if (!room.basePrice && !room.summerPrice && !room.winterPrice) {
-      return null;
+  const calculateSeasonalPrice = (
+    room: { summerPrice?: number; winterPrice?: number; basePrice?: number },
+    checkInDate?: string
+  ): number | undefined => {
+    if (
+      room.basePrice == null &&
+      room.summerPrice == null &&
+      room.winterPrice == null
+    ) {
+      return undefined;
     }
 
+    const pick = (isSummer: boolean) => {
+      return isSummer
+        ? room.summerPrice ?? room.basePrice ?? undefined
+        : room.winterPrice ?? room.basePrice ?? undefined;
+    };
+
     if (!checkInDate) {
-      // If no check-in date, return base price or current season price
       const currentMonth = new Date().getMonth() + 1;
       const isSummer = currentMonth >= 4 && currentMonth <= 9;
-      return isSummer
-        ? room.summerPrice || room.basePrice
-        : room.winterPrice || room.basePrice;
+      return pick(isSummer);
     }
 
     const checkIn = new Date(checkInDate);
     const month = checkIn.getMonth() + 1; // getMonth() returns 0-11
-
-    // Summer: April-September (months 4-9)
-    // Winter: October-March (months 10-12, 1-3)
     const isSummer = month >= 4 && month <= 9;
-
-    return isSummer
-      ? room.summerPrice || room.basePrice
-      : room.winterPrice || room.basePrice;
+    return pick(isSummer);
   };
 
   if (loading) {
@@ -284,7 +270,8 @@ export default function HotelDetailsPage() {
               Hotel Not Found
             </h1>
             <p className='text-gray-600 mb-6'>
-              The hotel you're looking for doesn't exist or has been removed.
+              The hotel you&apos;re looking for doesn&apos;t exist or has been
+              removed.
             </p>
             <Link
               href='/hotels'
@@ -796,109 +783,112 @@ export default function HotelDetailsPage() {
               </div>
             </div>
 
-            {/* Amenities */}
-            <div className='bg-white rounded-xl shadow-lg p-8'>
-              <h2 className='text-2xl font-bold text-gray-900 mb-6 flex items-center'>
-                <svg
-                  className='w-6 h-6 mr-3 text-green-600'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
-                >
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
-                  />
-                </svg>
-                Amenities
-              </h2>
-              {hotel.amenities && hotel.amenities.length > 0 ? (
-                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-                  {hotel.amenities.map((amenity) => (
-                    <div
-                      key={amenity}
-                      className='bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 flex items-center border border-green-100'
-                    >
-                      <div className='w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mr-4'>
-                        <span className='text-white font-bold'>✓</span>
+            {/* Right Column - Amenities and Policies */}
+            <div className='lg:col-span-1 space-y-6'>
+              {/* Amenities */}
+              <div className='bg-white rounded-xl shadow-lg p-8'>
+                <h2 className='text-2xl font-bold text-gray-900 mb-6 flex items-center'>
+                  <svg
+                    className='w-6 h-6 mr-3 text-green-600'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+                    />
+                  </svg>
+                  Amenities
+                </h2>
+                {hotel.amenities && hotel.amenities.length > 0 ? (
+                  <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+                    {hotel.amenities.map((amenity) => (
+                      <div
+                        key={amenity}
+                        className='bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 flex items-center border border-green-100'
+                      >
+                        <div className='w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mr-4'>
+                          <span className='text-white font-bold'>✓</span>
+                        </div>
+                        <span className='text-gray-800 font-medium capitalize'>
+                          {amenity}
+                        </span>
                       </div>
-                      <span className='text-gray-800 font-medium capitalize'>
-                        {amenity}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className='text-center py-8'>
-                  <div className='bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4'>
-                    <svg
-                      className='w-8 h-8 text-gray-400'
-                      fill='none'
-                      stroke='currentColor'
-                      viewBox='0 0 24 24'
-                    >
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth={2}
-                        d='M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                      />
-                    </svg>
+                    ))}
                   </div>
-                  <p className='text-gray-500'>No amenities listed</p>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className='text-center py-8'>
+                    <div className='bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4'>
+                      <svg
+                        className='w-8 h-8 text-gray-400'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth={2}
+                          d='M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                        />
+                      </svg>
+                    </div>
+                    <p className='text-gray-500'>No amenities listed</p>
+                  </div>
+                )}
+              </div>
 
-            {/* Policies */}
-            <div className='bg-white rounded-xl shadow-lg p-8'>
-              <h2 className='text-2xl font-bold text-gray-900 mb-6 flex items-center'>
-                <svg
-                  className='w-6 h-6 mr-3 text-blue-600'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
-                >
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                  />
-                </svg>
-                Hotel Policies
-              </h2>
-              <div className='bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl p-6'>
-                <div>
-                  <h3 className='font-bold text-gray-900 mb-3 flex items-center'>
-                    <svg
-                      className='w-5 h-5 mr-2 text-blue-600'
-                      fill='none'
-                      stroke='currentColor'
-                      viewBox='0 0 24 24'
-                    >
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth={2}
-                        d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
-                      />
-                    </svg>
-                    Cancellation Policy
-                  </h3>
-                  <p className='text-gray-700 leading-relaxed'>
-                    {hotel.cancellationPolicy ||
-                      "Cancellation policy information is not available for this property. Please contact the hotel directly for details."}
-                  </p>
+              {/* Policies */}
+              <div className='bg-white rounded-xl shadow-lg p-8'>
+                <h2 className='text-2xl font-bold text-gray-900 mb-6 flex items-center'>
+                  <svg
+                    className='w-6 h-6 mr-3 text-blue-600'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                    />
+                  </svg>
+                  Hotel Policies
+                </h2>
+                <div className='bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl p-6'>
+                  <div>
+                    <h3 className='font-bold text-gray-900 mb-3 flex items-center'>
+                      <svg
+                        className='w-5 h-5 mr-2 text-blue-600'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth={2}
+                          d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                        />
+                      </svg>
+                      Cancellation Policy
+                    </h3>
+                    <p className='text-gray-700 leading-relaxed'>
+                      {hotel.cancellationPolicy ||
+                        "Cancellation policy information is not available for this property. Please contact the hotel directly for details."}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right Column - Available Rooms - More Compact */}
-          <div className='space-y-5'>
+          {/* Available Rooms Section */}
+          <div className='mt-8'>
             <div className='bg-white rounded-xl shadow-lg overflow-hidden'>
               <div className='bg-gradient-to-r from-gray-900 to-gray-800 text-white p-5'>
                 <h2 className='text-xl font-bold flex items-center'>
@@ -1120,7 +1110,7 @@ export default function HotelDetailsPage() {
                         const totalPrice =
                           nights > 0 && seasonalPrice
                             ? seasonalPrice * nights
-                            : null;
+                            : undefined;
 
                         return (
                           <div
@@ -1207,20 +1197,27 @@ export default function HotelDetailsPage() {
                                     <>
                                       <div className='flex items-baseline gap-2 mb-1'>
                                         <span className='text-2xl font-bold text-gray-900'>
-                                          ₹{seasonalPrice.toLocaleString()}
+                                          ₹
+                                          {seasonalPrice
+                                            ? seasonalPrice.toLocaleString()
+                                            : "Price on request"}
                                         </span>
                                         <span className='text-gray-500 text-sm'>
                                           per night
                                         </span>
                                       </div>
                                       <div className='text-xs text-gray-500 mb-2'>
-                                        Base: ₹{room.basePrice.toLocaleString()}{" "}
+                                        Base: ₹
+                                        {room.basePrice?.toLocaleString() ??
+                                          "-"}{" "}
                                         | Summer: ₹
-                                        {room.summerPrice.toLocaleString()} |
-                                        Winter: ₹
-                                        {room.winterPrice.toLocaleString()}
+                                        {room.summerPrice?.toLocaleString() ??
+                                          "-"}{" "}
+                                        | Winter: ₹
+                                        {room.winterPrice?.toLocaleString() ??
+                                          "-"}
                                       </div>
-                                      {totalPrice && (
+                                      {typeof totalPrice === "number" && (
                                         <div className='bg-gray-100 rounded-lg p-3 mt-2'>
                                           <div className='text-sm text-gray-600 mb-1'>
                                             {nights} night
@@ -1269,9 +1266,11 @@ export default function HotelDetailsPage() {
                                           capacity: room.capacity,
                                           pricePerNight: seasonalPrice,
                                           totalPrice:
-                                            totalPrice || seasonalPrice,
+                                            typeof totalPrice === "number"
+                                              ? totalPrice
+                                              : seasonalPrice,
                                           amenities: room.amenities,
-                                        };
+                                        } as RoomAvailability;
                                         handleBookRoom(roomForBooking);
                                       }}
                                       disabled={!room.isAvailable}
@@ -1309,7 +1308,7 @@ export default function HotelDetailsPage() {
                           No Rooms Available
                         </p>
                         <p className='text-gray-400 text-sm'>
-                          This hotel doesn't have any rooms configured.
+                          This hotel doesn&apos;t have any rooms configured.
                         </p>
                       </div>
                     )}
