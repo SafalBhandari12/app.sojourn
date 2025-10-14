@@ -42,7 +42,7 @@ export default function AuthPage() {
     try {
       const params = new URLSearchParams(window.location.search);
       setReturnUrlFromParams(params.get("returnUrl"));
-    } catch (err) {
+    } catch {
       // ignore
     }
   }, []);
