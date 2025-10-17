@@ -333,7 +333,8 @@ export default function Home() {
               </h3>
               <p className='text-green-600 leading-relaxed'>
                 Handpicked properties in the most desirable destinations
-                worldwide, ensuring you're always in the heart of the action
+                worldwide, ensuring you&apos;re always in the heart of the
+                action
               </p>
             </div>
 
