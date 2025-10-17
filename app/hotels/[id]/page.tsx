@@ -293,9 +293,16 @@ export default function HotelDetailsPage() {
           <div className='flex items-center justify-between h-16'>
             <Link
               href='/'
-              className='text-2xl font-bold text-gray-900 hover:text-gray-700 transition-colors'
+              className='flex items-center hover:opacity-80 transition-opacity'
             >
-              Sojourn
+              <Image
+                src='/logo.jpg'
+                alt='Sojourn logo'
+                width={40}
+                height={40}
+                className='rounded-lg mr-3'
+              />
+              <span className='text-2xl font-bold text-gray-900'>Sojourn</span>
             </Link>
 
             {/* Authentication Navigation */}
