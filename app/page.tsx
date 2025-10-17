@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AuthService } from "../lib/auth";
 
@@ -68,27 +69,38 @@ export default function Home() {
   return (
     <div className='min-h-screen bg-gray-50'>
       {/* Header */}
-      <header className='bg-white shadow-sm border-b border-gray-200'>
+      <header className='bg-gray-50 shadow-sm border-b border-gray-100'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
           <div className='flex items-center justify-between h-16'>
-            <Link href='/' className='text-2xl font-semibold text-gray-900'>
-              Sojourn
+            <Link href='/' className='inline-flex items-center'>
+              <div className='flex items-center'>
+                <Image
+                  src='/logo.jpg'
+                  alt='Sojourn logo'
+                  width={60}
+                  height={50}
+                  priority
+                />
+                <span className='ml-3 text-sm text-gray-600 font-serif italic'>
+                  Your travel companion
+                </span>
+              </div>
             </Link>
             <div className='flex items-center space-x-8'>
               {/* Authentication Navigation */}
               {loading ? (
-                <div className='w-24 h-8 bg-gray-200 animate-pulse rounded'></div>
+                <div className='w-24 h-8 bg-gray-100 animate-pulse rounded'></div>
               ) : isAuthenticated ? (
                 <div className='flex items-center space-x-4'>
                   <Link
                     href='/bookings'
-                    className='text-gray-600 hover:text-gray-900 font-medium transition-colors'
+                    className='text-gray-500 hover:text-gray-700 font-medium transition-colors'
                   >
                     Your Bookings
                   </Link>
                   <button
                     onClick={handleSignOut}
-                    className='text-gray-600 hover:text-red-600 font-medium transition-colors'
+                    className='text-gray-500 hover:text-gray-700 font-medium transition-colors'
                   >
                     Sign Out
                   </button>
@@ -96,7 +108,7 @@ export default function Home() {
               ) : (
                 <Link
                   href='/auth'
-                  className='text-gray-600 hover:text-gray-900 font-medium transition-colors'
+                  className='text-gray-500 hover:text-gray-700 font-medium transition-colors'
                 >
                   Sign In
                 </Link>
@@ -109,17 +121,17 @@ export default function Home() {
       {/* Hero Section */}
       <section className='py-20 px-4 sm:px-6 lg:px-8'>
         <div className='max-w-4xl mx-auto text-center'>
-          <h1 className='text-4xl md:text-6xl font-light text-gray-900 mb-6 tracking-tight'>
+          <h1 className='text-4xl md:text-6xl font-light text-gray-700 mb-6 tracking-tight'>
             Find Your Perfect Stay
           </h1>
-          <p className='text-xl text-gray-600 mb-12 max-w-2xl mx-auto'>
+          <p className='text-xl text-gray-500 mb-12 max-w-2xl mx-auto'>
             Discover exceptional hotels and accommodations for your next journey
           </p>
 
           {/* Search Form */}
           <form
             onSubmit={handleSearch}
-            className='bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto'
+            className='bg-gray-50 rounded-lg shadow-lg p-6 max-w-4xl mx-auto'
           >
             <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
               {/* Location */}
@@ -152,7 +164,7 @@ export default function Home() {
                   onChange={(e) =>
                     setSearchData({ ...searchData, location: e.target.value })
                   }
-                  className='w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-colors text-black'
+                  className='w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-gray-400 transition-colors text-gray-700 bg-white'
                 />
               </div>
 
@@ -181,7 +193,7 @@ export default function Home() {
                     setSearchData({ ...searchData, checkIn: e.target.value })
                   }
                   min={getMinDate()}
-                  className='w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-colors text-black'
+                  className='w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-gray-400 transition-colors text-gray-700 bg-white'
                 />
               </div>
 
@@ -210,7 +222,7 @@ export default function Home() {
                     setSearchData({ ...searchData, checkOut: e.target.value })
                   }
                   min={getMinCheckOutDate()}
-                  className='w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-colors text-black'
+                  className='w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-gray-400 transition-colors text-gray-700 bg-white'
                 />
               </div>
 
@@ -239,7 +251,7 @@ export default function Home() {
                       guests: parseInt(e.target.value),
                     })
                   }
-                  className='w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-colors appearance-none text-black'
+                  className='w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-gray-400 transition-colors appearance-none text-gray-700 bg-white'
                 >
                   {Array.from({ length: 8 }, (_, i) => i + 1).map((num) => (
                     <option key={num} value={num}>
@@ -252,7 +264,7 @@ export default function Home() {
 
             <button
               type='submit'
-              className='w-full md:w-auto mt-6 bg-gray-900 hover:bg-gray-800 text-white px-8 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2'
+              className='w-full md:w-auto mt-6 bg-gray-700 hover:bg-gray-600 text-white px-8 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2'
             >
               <svg
                 className='h-5 w-5'
@@ -274,13 +286,13 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className='py-16 bg-white'>
+      <section className='py-16 bg-gray-50'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
           <div className='grid grid-cols-1 md:grid-cols-3 gap-8'>
             <div className='text-center'>
               <div className='inline-flex items-center justify-center w-12 h-12 bg-gray-100 rounded-lg mb-4'>
                 <svg
-                  className='h-6 w-6 text-gray-600'
+                  className='h-6 w-6 text-gray-500'
                   fill='none'
                   stroke='currentColor'
                   viewBox='0 0 24 24'
@@ -299,10 +311,10 @@ export default function Home() {
                   />
                 </svg>
               </div>
-              <h3 className='text-lg font-semibold text-gray-900 mb-2'>
+              <h3 className='text-lg font-semibold text-gray-700 mb-2'>
                 Best Locations
               </h3>
-              <p className='text-gray-600'>
+              <p className='text-gray-500'>
                 Handpicked properties in prime locations worldwide
               </p>
             </div>
@@ -310,7 +322,7 @@ export default function Home() {
             <div className='text-center'>
               <div className='inline-flex items-center justify-center w-12 h-12 bg-gray-100 rounded-lg mb-4'>
                 <svg
-                  className='h-6 w-6 text-gray-600'
+                  className='h-6 w-6 text-gray-500'
                   fill='none'
                   stroke='currentColor'
                   viewBox='0 0 24 24'
@@ -323,10 +335,10 @@ export default function Home() {
                   />
                 </svg>
               </div>
-              <h3 className='text-lg font-semibold text-gray-900 mb-2'>
+              <h3 className='text-lg font-semibold text-gray-700 mb-2'>
                 Trusted Booking
               </h3>
-              <p className='text-gray-600'>
+              <p className='text-gray-500'>
                 Secure payments and verified accommodations
               </p>
             </div>
@@ -334,7 +346,7 @@ export default function Home() {
             <div className='text-center'>
               <div className='inline-flex items-center justify-center w-12 h-12 bg-gray-100 rounded-lg mb-4'>
                 <svg
-                  className='h-6 w-6 text-gray-600'
+                  className='h-6 w-6 text-gray-500'
                   fill='none'
                   stroke='currentColor'
                   viewBox='0 0 24 24'
@@ -347,10 +359,10 @@ export default function Home() {
                   />
                 </svg>
               </div>
-              <h3 className='text-lg font-semibold text-gray-900 mb-2'>
+              <h3 className='text-lg font-semibold text-gray-700 mb-2'>
                 24/7 Support
               </h3>
-              <p className='text-gray-600'>
+              <p className='text-gray-500'>
                 Round-the-clock assistance for your travel needs
               </p>
             </div>
@@ -361,7 +373,7 @@ export default function Home() {
       {/* Popular Destinations */}
       <section className='py-16 bg-gray-50'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <h2 className='text-3xl font-light text-gray-900 text-center mb-12'>
+          <h2 className='text-3xl font-light text-gray-700 text-center mb-12'>
             Popular Destinations
           </h2>
 
@@ -379,12 +391,12 @@ export default function Home() {
               <Link
                 key={destination.name}
                 href={`/hotels?location=${destination.name}`}
-                className='group bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow border border-gray-200'
+                className='group bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow border border-gray-100'
               >
-                <h3 className='text-lg font-semibold text-gray-900 group-hover:text-gray-700 transition-colors'>
+                <h3 className='text-lg font-semibold text-gray-800 group-hover:text-gray-700 transition-colors'>
                   {destination.name}
                 </h3>
-                <p className='text-gray-600 text-sm mt-1'>
+                <p className='text-gray-500 text-sm mt-1'>
                   {destination.hotels}
                 </p>
               </Link>
@@ -393,31 +405,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className='bg-gray-900 text-white py-12'>
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <div className='text-center'>
-            <h3 className='text-2xl font-semibold mb-4'>Sojourn</h3>
-            <p className='text-gray-400 mb-8'>
-              Your trusted partner for exceptional travel experiences
-            </p>
-            <div className='flex justify-center space-x-8 text-sm text-gray-400'>
-              <Link href='#' className='hover:text-white transition-colors'>
-                About
-              </Link>
-              <Link href='#' className='hover:text-white transition-colors'>
-                Contact
-              </Link>
-              <Link href='#' className='hover:text-white transition-colors'>
-                Privacy
-              </Link>
-              <Link href='#' className='hover:text-white transition-colors'>
-                Terms
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
+      {/* Footer removed per request */}
     </div>
   );
 }
