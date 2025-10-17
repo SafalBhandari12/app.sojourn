@@ -69,6 +69,73 @@ const ID_PROOF_TYPES = [
   { value: "PAN_CARD", label: "PAN Card" },
 ];
 
+// ID Proof validation specifications
+interface IdValidationSpec {
+  displayName: string;
+  regex: RegExp;
+  fallbackRegex?: RegExp;
+  normalize: (value: string) => string;
+  format: (value: string) => string;
+  placeholder: string;
+  helpText: string;
+  examples: string[];
+}
+
+const ID_VALIDATION_SPECS: Record<string, IdValidationSpec> = {
+  AADHAR: {
+    displayName: "Aadhar Card",
+    regex: /^\d{12}$/,
+    normalize: (value: string) => value.replace(/\D/g, ""),
+    format: (value: string) =>
+      value.replace(/(\d{4})(\d{4})(\d{4})/, "$1 $2 $3"),
+    placeholder: "1234 5678 9012",
+    helpText: "12-digit number on your Aadhar card",
+    examples: ["1234 5678 9012", "123456789012"],
+  },
+  PAN_CARD: {
+    displayName: "PAN Card",
+    regex: /^[A-Z]{5}[0-9]{4}[A-Z]$/,
+    normalize: (value: string) => value.toUpperCase().replace(/\s/g, ""),
+    format: (value: string) => value.toUpperCase(),
+    placeholder: "ABCDE1234F",
+    helpText:
+      "10-character alphanumeric code (5 letters + 4 digits + 1 letter)",
+    examples: ["ABCDE1234F", "AAAAA0000A"],
+  },
+  PASSPORT: {
+    displayName: "Passport",
+    regex: /^[A-Z][0-9]{7}$/,
+    normalize: (value: string) => value.toUpperCase().replace(/\s/g, ""),
+    format: (value: string) => value.toUpperCase(),
+    placeholder: "A1234567",
+    helpText: "1 letter followed by 7 digits",
+    examples: ["A1234567", "K1234567"],
+  },
+  VOTER_ID: {
+    displayName: "Voter ID (EPIC)",
+    regex: /^[A-Z]{3}[0-9]{7}$/,
+    fallbackRegex: /^[A-Z0-9]{10}$/,
+    normalize: (value: string) => value.toUpperCase().replace(/[\s-]/g, ""),
+    format: (value: string) => value.toUpperCase(),
+    placeholder: "ABC1234567",
+    helpText:
+      "Usually 3 letters followed by 7 digits (format may vary by state)",
+    examples: ["ABC1234567", "TNM1234567"],
+  },
+  DRIVING_LICENSE: {
+    displayName: "Driving License",
+    regex: /^[A-Z]{2}\d{2}[ -]?[A-Z0-9]{7,12}$/,
+    fallbackRegex: /^[A-Z0-9- ]{6,20}$/,
+    normalize: (value: string) =>
+      value.toUpperCase().replace(/\s+/g, " ").trim(),
+    format: (value: string) => value.toUpperCase(),
+    placeholder: "MH12-20150012345",
+    helpText:
+      "State-specific format, commonly starts with state code + RTO code",
+    examples: ["MH12-20150012345", "DL0420110149645", "KA01 1234567"],
+  },
+};
+
 export default function BookingPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -311,6 +378,41 @@ export default function BookingPage() {
     return emailRegex.test(email);
   };
 
+  const validateIdProof = (type: string, value: string) => {
+    if (!type || !value) return { isValid: true, message: "" }; // Optional field
+
+    const spec = ID_VALIDATION_SPECS[type];
+    if (!spec) return { isValid: false, message: "Invalid ID type" };
+
+    const normalizedValue = spec.normalize(value);
+
+    // Try primary regex first
+    if (spec.regex.test(normalizedValue)) {
+      return { isValid: true, message: "" };
+    }
+
+    // Try fallback regex if available
+    if (spec.fallbackRegex && spec.fallbackRegex.test(normalizedValue)) {
+      return { isValid: true, message: "" };
+    }
+
+    return {
+      isValid: false,
+      message: `Invalid ${spec.displayName} format. ${
+        spec.helpText
+      }. Examples: ${spec.examples.join(", ")}`,
+    };
+  };
+
+  const formatIdProof = (type: string, value: string) => {
+    if (!type || !value) return value;
+
+    const spec = ID_VALIDATION_SPECS[type];
+    if (!spec) return value;
+
+    return spec.format(value);
+  };
+
   const copyUserDetailsToGuest = (guestIndex: number) => {
     setFormData((prev) => ({
       ...prev,
@@ -344,12 +446,43 @@ export default function BookingPage() {
       return false;
     }
 
+    // Validate user ID proof if provided
+    if (
+      formData.userDetails.idProofType &&
+      formData.userDetails.idProofNumber
+    ) {
+      const userIdValidation = validateIdProof(
+        formData.userDetails.idProofType,
+        formData.userDetails.idProofNumber
+      );
+      if (!userIdValidation.isValid) {
+        alert(`Your ID proof validation failed: ${userIdValidation.message}`);
+        return false;
+      }
+    }
+
     // Validate guest details
     for (let i = 0; i < formData.guestDetails.length; i++) {
       const guest = formData.guestDetails[i];
       if (!guest.firstName || !guest.lastName) {
         alert(`Please fill in the first name and last name for guest ${i + 1}`);
         return false;
+      }
+
+      // Validate guest ID proof if provided
+      if (guest.idProofType && guest.idProofNumber) {
+        const guestIdValidation = validateIdProof(
+          guest.idProofType,
+          guest.idProofNumber
+        );
+        if (!guestIdValidation.isValid) {
+          alert(
+            `Guest ${i + 1} ID proof validation failed: ${
+              guestIdValidation.message
+            }`
+          );
+          return false;
+        }
       }
     }
 
@@ -890,15 +1023,66 @@ export default function BookingPage() {
                       <input
                         type='text'
                         value={formData.userDetails.idProofNumber}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const formattedValue = formatIdProof(
+                            formData.userDetails.idProofType!,
+                            e.target.value
+                          );
                           handleInputChange(
                             "userDetails.idProofNumber",
-                            e.target.value
-                          )
+                            formattedValue
+                          );
+                        }}
+                        className={`w-full px-3 py-2 border focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white ${
+                          formData.userDetails.idProofNumber &&
+                          !validateIdProof(
+                            formData.userDetails.idProofType!,
+                            formData.userDetails.idProofNumber
+                          ).isValid
+                            ? "border-red-300 bg-red-50"
+                            : "border-gray-300"
+                        }`}
+                        placeholder={
+                          ID_VALIDATION_SPECS[formData.userDetails.idProofType]
+                            ?.placeholder ||
+                          `Enter ${formData.userDetails.idProofType} number`
                         }
-                        className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
-                        placeholder={`Enter ${formData.userDetails.idProofType} number`}
                       />
+                      {formData.userDetails.idProofType &&
+                        ID_VALIDATION_SPECS[
+                          formData.userDetails.idProofType
+                        ] && (
+                          <div className='mt-1'>
+                            <p className='text-xs text-gray-600'>
+                              📝{" "}
+                              {
+                                ID_VALIDATION_SPECS[
+                                  formData.userDetails.idProofType
+                                ].helpText
+                              }
+                            </p>
+                            <p className='text-xs text-gray-500'>
+                              Examples:{" "}
+                              {ID_VALIDATION_SPECS[
+                                formData.userDetails.idProofType
+                              ].examples.join(", ")}
+                            </p>
+                          </div>
+                        )}
+                      {formData.userDetails.idProofNumber &&
+                        !validateIdProof(
+                          formData.userDetails.idProofType!,
+                          formData.userDetails.idProofNumber
+                        ).isValid && (
+                          <p className='text-red-600 text-xs mt-1'>
+                            {
+                              validateIdProof(
+                                formData.userDetails.idProofType!,
+                                formData.userDetails.idProofNumber
+                              ).message
+                            }
+                          </p>
+                        )}
                     </div>
                   )}
                 </div>
@@ -1038,15 +1222,63 @@ export default function BookingPage() {
                           <input
                             type='text'
                             value={guest.idProofNumber || ""}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const formattedValue = formatIdProof(
+                                guest.idProofType!,
+                                e.target.value
+                              );
                               handleInputChange(
                                 `guest.${index}.idProofNumber`,
-                                e.target.value
-                              )
+                                formattedValue
+                              );
+                            }}
+                            className={`w-full px-3 py-2 border focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white ${
+                              guest.idProofNumber &&
+                              !validateIdProof(
+                                guest.idProofType!,
+                                guest.idProofNumber
+                              ).isValid
+                                ? "border-red-300 bg-red-50"
+                                : "border-gray-300"
+                            }`}
+                            placeholder={
+                              ID_VALIDATION_SPECS[guest.idProofType]
+                                ?.placeholder ||
+                              `Enter ${guest.idProofType} number`
                             }
-                            className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
-                            placeholder={`Enter ${guest.idProofType} number`}
                           />
+                          {guest.idProofType &&
+                            ID_VALIDATION_SPECS[guest.idProofType] && (
+                              <div className='mt-1'>
+                                <p className='text-xs text-gray-600'>
+                                  📝{" "}
+                                  {
+                                    ID_VALIDATION_SPECS[guest.idProofType]
+                                      .helpText
+                                  }
+                                </p>
+                                <p className='text-xs text-gray-500'>
+                                  Examples:{" "}
+                                  {ID_VALIDATION_SPECS[
+                                    guest.idProofType
+                                  ].examples.join(", ")}
+                                </p>
+                              </div>
+                            )}
+                          {guest.idProofNumber &&
+                            !validateIdProof(
+                              guest.idProofType!,
+                              guest.idProofNumber
+                            ).isValid && (
+                              <p className='text-red-600 text-xs mt-1'>
+                                {
+                                  validateIdProof(
+                                    guest.idProofType!,
+                                    guest.idProofNumber
+                                  ).message
+                                }
+                              </p>
+                            )}
                         </div>
                       )}
 
