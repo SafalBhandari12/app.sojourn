@@ -67,40 +67,39 @@ export default function Home() {
   };
 
   return (
-    <div className='min-h-screen bg-gray-50'>
+    <div className='min-h-screen bg-gradient-to-br from-green-50 to-emerald-50'>
       {/* Header */}
-      <header className='bg-gray-50 shadow-sm border-b border-gray-100'>
+      <header className='fixed top-0 left-0 right-0 bg-white shadow-lg border-b border-green-100 z-50'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
           <div className='flex items-center justify-between h-16'>
-            <Link href='/' className='inline-flex items-center'>
-              <div className='flex items-center'>
-                <Image
-                  src='/logo.jpg'
-                  alt='Sojourn logo'
-                  width={60}
-                  height={50}
-                  priority
-                />
-                <span className='ml-3 text-sm text-gray-600 font-serif italic'>
-                  Your travel companion
-                </span>
-              </div>
+            <Link href='/' className='flex items-center space-x-3'>
+              <Image
+                src='/logo.jpg'
+                alt='Sojourn logo'
+                width={40}
+                height={40}
+                priority
+                className='w-8 h-8 object-contain'
+              />
+              <span className='text-xl font-semibold text-green-800'>
+                Sojourn
+              </span>
             </Link>
-            <div className='flex items-center space-x-8'>
+            <div className='flex items-center space-x-6'>
               {/* Authentication Navigation */}
               {loading ? (
-                <div className='w-24 h-8 bg-gray-100 animate-pulse rounded'></div>
+                <div className='w-24 h-10 bg-green-100 animate-pulse rounded-lg'></div>
               ) : isAuthenticated ? (
                 <div className='flex items-center space-x-4'>
                   <Link
                     href='/bookings'
-                    className='text-gray-500 hover:text-gray-700 font-medium transition-colors'
+                    className='text-green-700 hover:text-green-900 font-medium transition-colors px-4 py-2 rounded-lg hover:bg-green-50'
                   >
                     Your Bookings
                   </Link>
                   <button
                     onClick={handleSignOut}
-                    className='text-gray-500 hover:text-gray-700 font-medium transition-colors'
+                    className='text-green-700 hover:text-red-600 font-medium transition-colors px-4 py-2 rounded-lg hover:bg-red-50'
                   >
                     Sign Out
                   </button>
@@ -108,7 +107,7 @@ export default function Home() {
               ) : (
                 <Link
                   href='/auth'
-                  className='text-gray-500 hover:text-gray-700 font-medium transition-colors'
+                  className='bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
                 >
                   Sign In
                 </Link>
@@ -119,26 +118,33 @@ export default function Home() {
       </header>
 
       {/* Hero Section */}
-      <section className='py-20 px-4 sm:px-6 lg:px-8'>
-        <div className='max-w-4xl mx-auto text-center'>
-          <h1 className='text-4xl md:text-6xl font-light text-gray-700 mb-6 tracking-tight'>
-            Find Your Perfect Stay
+      <section className='pt-24 pb-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden'>
+        {/* Background decoration */}
+        <div className='absolute inset-0 bg-gradient-to-r from-green-100/50 to-emerald-100/50 rounded-full blur-3xl transform -translate-y-1/2 scale-150'></div>
+
+        <div className='max-w-6xl mx-auto text-center relative z-10'>
+          <h1 className='text-5xl md:text-7xl font-light text-green-800 mb-8 tracking-tight leading-tight'>
+            Find Your Perfect
+            <span className='block bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent font-medium'>
+              Stay
+            </span>
           </h1>
-          <p className='text-xl text-gray-500 mb-12 max-w-2xl mx-auto'>
+          <p className='text-xl md:text-2xl text-green-700 mb-16 max-w-3xl mx-auto leading-relaxed'>
             Discover exceptional hotels and accommodations for your next journey
+            with personalized recommendations
           </p>
 
           {/* Search Form */}
           <form
             onSubmit={handleSearch}
-            className='bg-gray-50 rounded-lg shadow-lg p-6 max-w-4xl mx-auto'
+            className='bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-5xl mx-auto border border-green-100'
           >
-            <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
+            <div className='grid grid-cols-1 md:grid-cols-4 gap-6'>
               {/* Location */}
-              <div className='relative'>
-                <div className='absolute inset-y-0 left-3 flex items-center pointer-events-none'>
+              <div className='relative group'>
+                <div className='absolute inset-y-0 left-4 flex items-center pointer-events-none z-10'>
                   <svg
-                    className='h-5 w-5 text-gray-400'
+                    className='h-5 w-5 text-green-500 group-focus-within:text-green-600 transition-colors'
                     fill='none'
                     stroke='currentColor'
                     viewBox='0 0 24 24'
@@ -164,15 +170,15 @@ export default function Home() {
                   onChange={(e) =>
                     setSearchData({ ...searchData, location: e.target.value })
                   }
-                  className='w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-gray-400 transition-colors text-gray-700 bg-white'
+                  className='w-full pl-12 pr-4 py-4 border-2 border-green-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all text-green-800 bg-white placeholder-green-400 hover:border-green-300'
                 />
               </div>
 
               {/* Check-in */}
-              <div className='relative'>
-                <div className='absolute inset-y-0 left-3 flex items-center pointer-events-none'>
+              <div className='relative group'>
+                <div className='absolute inset-y-0 left-4 flex items-center pointer-events-none z-10'>
                   <svg
-                    className='h-5 w-5 text-gray-400'
+                    className='h-5 w-5 text-green-500 group-focus-within:text-green-600 transition-colors'
                     fill='none'
                     stroke='currentColor'
                     viewBox='0 0 24 24'
@@ -193,15 +199,15 @@ export default function Home() {
                     setSearchData({ ...searchData, checkIn: e.target.value })
                   }
                   min={getMinDate()}
-                  className='w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-gray-400 transition-colors text-gray-700 bg-white'
+                  className='w-full pl-12 pr-4 py-4 border-2 border-green-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all text-green-800 bg-white hover:border-green-300'
                 />
               </div>
 
               {/* Check-out */}
-              <div className='relative'>
-                <div className='absolute inset-y-0 left-3 flex items-center pointer-events-none'>
+              <div className='relative group'>
+                <div className='absolute inset-y-0 left-4 flex items-center pointer-events-none z-10'>
                   <svg
-                    className='h-5 w-5 text-gray-400'
+                    className='h-5 w-5 text-green-500 group-focus-within:text-green-600 transition-colors'
                     fill='none'
                     stroke='currentColor'
                     viewBox='0 0 24 24'
@@ -222,15 +228,15 @@ export default function Home() {
                     setSearchData({ ...searchData, checkOut: e.target.value })
                   }
                   min={getMinCheckOutDate()}
-                  className='w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-gray-400 transition-colors text-gray-700 bg-white'
+                  className='w-full pl-12 pr-4 py-4 border-2 border-green-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all text-green-800 bg-white hover:border-green-300'
                 />
               </div>
 
               {/* Guests */}
-              <div className='relative'>
-                <div className='absolute inset-y-0 left-3 flex items-center pointer-events-none'>
+              <div className='relative group'>
+                <div className='absolute inset-y-0 left-4 flex items-center pointer-events-none z-10'>
                   <svg
-                    className='h-5 w-5 text-gray-400'
+                    className='h-5 w-5 text-green-500 group-focus-within:text-green-600 transition-colors'
                     fill='none'
                     stroke='currentColor'
                     viewBox='0 0 24 24'
@@ -239,7 +245,7 @@ export default function Home() {
                       strokeLinecap='round'
                       strokeLinejoin='round'
                       strokeWidth={2}
-                      d='M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z'
+                      d='M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 515 0z'
                     />
                   </svg>
                 </div>
@@ -251,7 +257,7 @@ export default function Home() {
                       guests: parseInt(e.target.value),
                     })
                   }
-                  className='w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-gray-400 transition-colors appearance-none text-gray-700 bg-white'
+                  className='w-full pl-12 pr-4 py-4 border-2 border-green-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all appearance-none text-green-800 bg-white hover:border-green-300'
                 >
                   {Array.from({ length: 8 }, (_, i) => i + 1).map((num) => (
                     <option key={num} value={num}>
@@ -264,10 +270,10 @@ export default function Home() {
 
             <button
               type='submit'
-              className='w-full md:w-auto mt-6 bg-gray-700 hover:bg-gray-600 text-white px-8 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2'
+              className='w-full md:w-auto mt-8 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-12 py-4 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1 text-lg'
             >
               <svg
-                className='h-5 w-5'
+                className='h-6 w-6'
                 fill='none'
                 stroke='currentColor'
                 viewBox='0 0 24 24'
@@ -286,13 +292,24 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className='py-16 bg-gray-50'>
+      <section className='py-20 bg-white/60 backdrop-blur-sm'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+          <div className='text-center mb-16'>
+            <h2 className='text-3xl md:text-4xl font-light text-green-800 mb-4'>
+              Why Choose{" "}
+              <span className='font-medium text-emerald-600'>Sojourn</span>
+            </h2>
+            <p className='text-lg text-green-700 max-w-2xl mx-auto'>
+              Experience the difference with our carefully curated services and
+              unmatched hospitality
+            </p>
+          </div>
+
           <div className='grid grid-cols-1 md:grid-cols-3 gap-8'>
-            <div className='text-center'>
-              <div className='inline-flex items-center justify-center w-12 h-12 bg-gray-100 rounded-lg mb-4'>
+            <div className='text-center group hover:transform hover:scale-105 transition-all duration-300'>
+              <div className='inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-green-100 to-emerald-100 rounded-2xl mb-6 group-hover:from-green-200 group-hover:to-emerald-200 transition-all duration-300'>
                 <svg
-                  className='h-6 w-6 text-gray-500'
+                  className='h-8 w-8 text-green-600'
                   fill='none'
                   stroke='currentColor'
                   viewBox='0 0 24 24'
@@ -307,22 +324,23 @@ export default function Home() {
                     strokeLinecap='round'
                     strokeLinejoin='round'
                     strokeWidth={2}
-                    d='M15 11a3 3 0 11-6 0 3 3 0 016 0z'
+                    d='M15 11a3 3 0 11-6 0 3 3 0 616 0z'
                   />
                 </svg>
               </div>
-              <h3 className='text-lg font-semibold text-gray-700 mb-2'>
-                Best Locations
+              <h3 className='text-xl font-semibold text-green-800 mb-3'>
+                Prime Locations
               </h3>
-              <p className='text-gray-500'>
-                Handpicked properties in prime locations worldwide
+              <p className='text-green-600 leading-relaxed'>
+                Handpicked properties in the most desirable destinations
+                worldwide, ensuring you're always in the heart of the action
               </p>
             </div>
 
-            <div className='text-center'>
-              <div className='inline-flex items-center justify-center w-12 h-12 bg-gray-100 rounded-lg mb-4'>
+            <div className='text-center group hover:transform hover:scale-105 transition-all duration-300'>
+              <div className='inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-green-100 to-emerald-100 rounded-2xl mb-6 group-hover:from-green-200 group-hover:to-emerald-200 transition-all duration-300'>
                 <svg
-                  className='h-6 w-6 text-gray-500'
+                  className='h-8 w-8 text-green-600'
                   fill='none'
                   stroke='currentColor'
                   viewBox='0 0 24 24'
@@ -335,18 +353,19 @@ export default function Home() {
                   />
                 </svg>
               </div>
-              <h3 className='text-lg font-semibold text-gray-700 mb-2'>
+              <h3 className='text-xl font-semibold text-green-800 mb-3'>
                 Trusted Booking
               </h3>
-              <p className='text-gray-500'>
-                Secure payments and verified accommodations
+              <p className='text-green-600 leading-relaxed'>
+                Secure payments, verified accommodations, and transparent
+                pricing. Your peace of mind is our top priority
               </p>
             </div>
 
-            <div className='text-center'>
-              <div className='inline-flex items-center justify-center w-12 h-12 bg-gray-100 rounded-lg mb-4'>
+            <div className='text-center group hover:transform hover:scale-105 transition-all duration-300'>
+              <div className='inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-green-100 to-emerald-100 rounded-2xl mb-6 group-hover:from-green-200 group-hover:to-emerald-200 transition-all duration-300'>
                 <svg
-                  className='h-6 w-6 text-gray-500'
+                  className='h-8 w-8 text-green-600'
                   fill='none'
                   stroke='currentColor'
                   viewBox='0 0 24 24'
@@ -359,11 +378,12 @@ export default function Home() {
                   />
                 </svg>
               </div>
-              <h3 className='text-lg font-semibold text-gray-700 mb-2'>
+              <h3 className='text-xl font-semibold text-green-800 mb-3'>
                 24/7 Support
               </h3>
-              <p className='text-gray-500'>
-                Round-the-clock assistance for your travel needs
+              <p className='text-green-600 leading-relaxed'>
+                Round-the-clock assistance from our dedicated travel experts,
+                ensuring your journey is seamless from start to finish
               </p>
             </div>
           </div>
@@ -371,34 +391,89 @@ export default function Home() {
       </section>
 
       {/* Popular Destinations */}
-      <section className='py-16 bg-gray-50'>
+      <section className='py-20 bg-gradient-to-b from-green-50/50 to-emerald-50/50'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <h2 className='text-3xl font-light text-gray-700 text-center mb-12'>
-            Popular Destinations
-          </h2>
+          <div className='text-center mb-16'>
+            <h2 className='text-3xl md:text-4xl font-light text-green-800 mb-4'>
+              Popular{" "}
+              <span className='font-medium text-emerald-600'>Destinations</span>
+            </h2>
+            <p className='text-lg text-green-700 max-w-2xl mx-auto'>
+              Discover amazing places and create unforgettable memories in these
+              trending destinations
+            </p>
+          </div>
 
           <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6'>
             {[
-              { name: "Mumbai", hotels: "150+ hotels" },
-              { name: "Delhi", hotels: "200+ hotels" },
-              { name: "Bangalore", hotels: "120+ hotels" },
-              { name: "Goa", hotels: "80+ hotels" },
-              { name: "Jaipur", hotels: "90+ hotels" },
-              { name: "Chennai", hotels: "110+ hotels" },
-              { name: "Kolkata", hotels: "85+ hotels" },
-              { name: "Hyderabad", hotels: "95+ hotels" },
+              {
+                name: "Mumbai",
+                hotels: "150+ hotels",
+                description: "The City of Dreams",
+              },
+              {
+                name: "Delhi",
+                hotels: "200+ hotels",
+                description: "Heart of India",
+              },
+              {
+                name: "Bangalore",
+                hotels: "120+ hotels",
+                description: "Silicon Valley of India",
+              },
+              {
+                name: "Goa",
+                hotels: "80+ hotels",
+                description: "Beach Paradise",
+              },
+              {
+                name: "Jaipur",
+                hotels: "90+ hotels",
+                description: "The Pink City",
+              },
+              {
+                name: "Chennai",
+                hotels: "110+ hotels",
+                description: "Gateway to South India",
+              },
+              {
+                name: "Kolkata",
+                hotels: "85+ hotels",
+                description: "Cultural Capital",
+              },
+              {
+                name: "Hyderabad",
+                hotels: "95+ hotels",
+                description: "City of Pearls",
+              },
             ].map((destination) => (
               <Link
                 key={destination.name}
                 href={`/hotels?location=${destination.name}`}
-                className='group bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow border border-gray-100'
+                className='group bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 border border-green-100 hover:border-green-200 transform hover:-translate-y-2'
               >
-                <h3 className='text-lg font-semibold text-gray-800 group-hover:text-gray-700 transition-colors'>
-                  {destination.name}
-                </h3>
-                <p className='text-gray-500 text-sm mt-1'>
-                  {destination.hotels}
+                <div className='flex items-center justify-between mb-3'>
+                  <h3 className='text-xl font-semibold text-green-800 group-hover:text-emerald-600 transition-colors'>
+                    {destination.name}
+                  </h3>
+                  <svg
+                    className='w-5 h-5 text-green-500 group-hover:text-emerald-500 transform group-hover:translate-x-1 transition-all'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M9 5l7 7-7 7'
+                    />
+                  </svg>
+                </div>
+                <p className='text-sm text-green-600 mb-2 font-medium'>
+                  {destination.description}
                 </p>
+                <p className='text-green-500 text-sm'>{destination.hotels}</p>
               </Link>
             ))}
           </div>

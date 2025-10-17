@@ -306,10 +306,41 @@ export default function BookingPage() {
     }
   };
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const copyUserDetailsToGuest = (guestIndex: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      guestDetails: prev.guestDetails.map((guest, index) =>
+        index === guestIndex
+          ? {
+              ...guest,
+              firstName: prev.userDetails.firstName,
+              lastName: prev.userDetails.lastName,
+              idProofType: prev.userDetails.idProofType || "",
+              idProofNumber: prev.userDetails.idProofNumber || "",
+            }
+          : guest
+      ),
+    }));
+  };
+
   const validateForm = () => {
     // Validate user details
     if (!formData.userDetails.firstName || !formData.userDetails.lastName) {
       alert("Please fill in your first name and last name");
+      return false;
+    }
+
+    // Validate email if provided
+    if (
+      formData.userDetails.email &&
+      !validateEmail(formData.userDetails.email)
+    ) {
+      alert("Please enter a valid email address");
       return false;
     }
 
@@ -762,9 +793,20 @@ export default function BookingPage() {
                       onChange={(e) =>
                         handleInputChange("userDetails.email", e.target.value)
                       }
-                      className='w-full px-3 py-2 border border-gray-300 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white'
+                      className={`w-full px-3 py-2 border focus:ring-1 focus:ring-gray-900 focus:border-gray-900 text-gray-900 bg-white ${
+                        formData.userDetails.email &&
+                        !validateEmail(formData.userDetails.email)
+                          ? "border-red-300 bg-red-50"
+                          : "border-gray-300"
+                      }`}
                       placeholder='Enter email address'
                     />
+                    {formData.userDetails.email &&
+                      !validateEmail(formData.userDetails.email) && (
+                        <p className='text-red-600 text-xs mt-1'>
+                          Please enter a valid email address
+                        </p>
+                      )}
                   </div>
 
                   <div>
@@ -877,23 +919,35 @@ export default function BookingPage() {
                       <h4 className='font-medium text-gray-900'>
                         Guest {index + 1}
                       </h4>
-                      <label className='flex items-center'>
-                        <input
-                          type='radio'
-                          name='primaryGuest'
-                          checked={guest.isPrimaryGuest}
-                          onChange={(e) =>
-                            handleInputChange(
-                              `guest.${index}.isPrimaryGuest`,
-                              e.target.checked ? "true" : "false"
-                            )
-                          }
-                          className='mr-2'
-                        />
-                        <span className='text-sm text-gray-600'>
-                          Primary Guest
-                        </span>
-                      </label>
+                      <div className='flex items-center space-x-4'>
+                        {guest.isPrimaryGuest && (
+                          <button
+                            type='button'
+                            onClick={() => copyUserDetailsToGuest(index)}
+                            className='text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded transition-colors'
+                            title='Copy your details to this guest'
+                          >
+                            Copy My Details
+                          </button>
+                        )}
+                        <label className='flex items-center'>
+                          <input
+                            type='radio'
+                            name='primaryGuest'
+                            checked={guest.isPrimaryGuest}
+                            onChange={(e) =>
+                              handleInputChange(
+                                `guest.${index}.isPrimaryGuest`,
+                                e.target.checked ? "true" : "false"
+                              )
+                            }
+                            className='mr-2'
+                          />
+                          <span className='text-sm text-gray-600'>
+                            Primary Guest
+                          </span>
+                        </label>
+                      </div>
                     </div>
 
                     <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>

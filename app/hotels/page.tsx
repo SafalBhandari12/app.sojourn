@@ -230,11 +230,14 @@ export default function HotelsPage() {
       <header className='bg-white shadow-sm border-b border-gray-200'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
           <div className='flex items-center justify-between h-16'>
-            <Link
-              href='/'
-              className='text-2xl font-bold text-gray-900 hover:text-gray-700 transition-colors'
-            >
-              Sojourn
+            <Link href='/' className='inline-flex items-center'>
+              <Image
+                src='/logo.jpg'
+                alt='Sojourn logo'
+                width={60}
+                height={40}
+                priority
+              />
             </Link>
 
             {/* Authentication Navigation */}
@@ -516,25 +519,6 @@ export default function HotelsPage() {
                 </div>
               )}
             </div>
-
-            {/* Debug Info (remove in production) */}
-            {process.env.NODE_ENV === "development" && (
-              <div className='bg-gray-100 p-4 rounded-lg mb-6 text-sm'>
-                <h3 className='font-semibold mb-2'>Debug Info:</h3>
-                <p>
-                  <strong>API URL:</strong> {BACKEND_URL}
-                </p>
-                <p>
-                  <strong>Current Filters:</strong> {JSON.stringify(filters)}
-                </p>
-                <p>
-                  <strong>Hotels Count:</strong> {hotels.length}
-                </p>
-                <p>
-                  <strong>Loading:</strong> {loading ? "Yes" : "No"}
-                </p>
-              </div>
-            )}
 
             {/* Hotel Cards or Empty State */}
             {hotels.length > 0 ? (
